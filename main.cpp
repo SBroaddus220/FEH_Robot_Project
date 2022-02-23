@@ -5,9 +5,26 @@
 /*      Steven Broaddus, Conolly Burgess     */
 /*        Joseph Richmond, Jake Chang        */
 /*                                           */
-/*            Updated 2/20/2022              */
+/*            Updated 2/23/2022              */
 /*       Uses Doxygen for documentation      */
 /*********************************************/
+
+/*
+ * TO DO:
+ *
+ * 1. See start light with function
+ * 
+ * 2. Test jukebox button function
+ *
+ * 3. Test code to get to jukebox sensor
+ * 
+ * 4. Test code to get to ramp from jukebox
+ * 
+ * 5. Test code to go up ramp
+ * 
+ * 6. Implement RPS checking when QR code is added
+ * 
+ */ 
 
 // Include preprocessor directives
 #include <FEHLCD.h>
@@ -18,11 +35,24 @@
 #include <cmath> // abs() 
 
 // Definitions
-#define TEST_COURSE 0 // Number of course for testing
-#define ROBOT_WIDTH 6.5 // Length of front/back side of robot in inches
+#define ROBOT_WIDTH 7.625 // Length of front/back side of robot in inches
 #define PI 3.14159265
 #define BACKGROUND_COLOR WHITE // Background color of layout
 #define FONT_COLOR BLACK // Font color of layout
+
+// Courses 
+#define TEST_COURSE 0 // Number of course for testing
+
+/*
+ * One of our motors is inversed, so it'll be different than test code with the Crayola bot. 
+ *
+ * This shows if we are testing our robot or the crayola bot so only one place needs to be changed.
+ * Affects all moving functions.
+ * 
+ * true -> Our robot
+ * false -> Crayola bot
+ */ 
+#define INVERSED_WHEEL false
 
 /*
  * Number of encoder counts per inch.
@@ -60,27 +90,20 @@ AnalogInputPin CdS_cell(FEHIO::P0_2);
 int startUp() 
 {
     // Initializes the screen
-    LCD.Clear();
     LCD.SetBackgroundColor(BACKGROUND_COLOR);
     LCD.SetFontColor(FONT_COLOR);
-    LCD.WriteRC("Robot Starting Up", 2, 4);
-    Sleep(0.25);
-    LCD.WriteRC('.', 2, 21);
-    Sleep(0.25);
-    LCD.WriteRC('.', 2, 22);
-    Sleep(0.25);
-    LCD.WriteRC('.', 2, 23);
-    Sleep(0.25);
+    LCD.Clear();
+    writeStatus("Press to run...");
+    Sleep(1.0);
 
     return 0;
-
 }
 
 /*******************************************************
- * @brief Moves forward a number of inches using encoders
+ * @brief Moves CENTER OF ROBOT forward a number of inches using encoders
  * @author Steven Broaddus
  * @param percent - Percent for the motors to run at. Negative for reverse.
- * @param inches - Inches to move forward 
+ * @param inches - Inches to move forward .
  */
 void move_forward_inches(int percent, float inches)
 {
@@ -100,8 +123,12 @@ void move_forward_inches(int percent, float inches)
     right_encoder.ResetCounts();
     left_encoder.ResetCounts();
 
-    // Sets both motors to specific percentage
-    right_motor.SetPercent(percent);
+    // Sets both motors to same percentage
+    if (INVERSED_WHEEL) {
+        right_motor.SetPercent(-percent);
+    } else {
+        right_motor.SetPercent(percent);
+    }
     left_motor.SetPercent(percent);
 
     // Keeps running until average motor counts are in proper range
@@ -112,21 +139,21 @@ void move_forward_inches(int percent, float inches)
     left_motor.Stop();
 
     //Print out data
-    LCD.WriteRC("Theoretical Counts: ", 9, 2);
+    LCD.WriteRC("Theoretical Counts: ", 9, 1);
     LCD.WriteRC(expectedCounts, 9, 20);
-    LCD.WriteRC("Motor Percent: ", 10, 2);
+    LCD.WriteRC("Motor Percent: ", 10, 1);
     LCD.WriteRC(percent, 10, 20);
-    LCD.WriteRC("Actual LE Counts: ", 11, 2);
+    LCD.WriteRC("Actual LE Counts: ", 11, 1);
     LCD.WriteRC(left_encoder.Counts(), 11, 20);
-    LCD.WriteRC("Actual RE Counts: ", 12, 2);
+    LCD.WriteRC("Actual RE Counts: ", 12, 1);
     LCD.WriteRC(right_encoder.Counts(), 12, 20);
 }
 
 /*******************************************************
  * @brief Turns right a certain amount of degrees
  * 
- * @param percent 
- * @param degrees 
+ * @param percent - Percent for the motors to run at. Negative for reverse.
+ * @param degrees - Degrees to rotate.
  */
 void turn_right_degrees(int percent, float degrees) {
     // Calculates desired counts based on the radius of the wheels and the robot
@@ -146,7 +173,11 @@ void turn_right_degrees(int percent, float degrees) {
     left_encoder.ResetCounts();
 
     // Sets both motors to specific percentage
-    right_motor.SetPercent(-percent);
+    if (INVERSED_WHEEL) {
+        right_motor.SetPercent(percent);
+    } else {
+        right_motor.SetPercent(-percent);
+    }
     left_motor.SetPercent(percent);
 
     // Keeps running until average motor counts are in proper range
@@ -157,21 +188,21 @@ void turn_right_degrees(int percent, float degrees) {
     left_motor.Stop();
 
     //Print out data
-    LCD.WriteRC("Theoretical Counts: ", 9, 2);
+    LCD.WriteRC("Theoretical Counts: ", 9, 1);
     LCD.WriteRC(expectedCounts, 9, 20);
-    LCD.WriteRC("Motor Percent: ", 10, 2);
+    LCD.WriteRC("Motor Percent: ", 10, 1);
     LCD.WriteRC(percent, 10, 20);
-    LCD.WriteRC("Actual LE Counts: ", 11, 2);
+    LCD.WriteRC("Actual LE Counts: ", 11, 1);
     LCD.WriteRC(left_encoder.Counts(), 11, 20);
-    LCD.WriteRC("Actual RE Counts: ", 12, 2);
+    LCD.WriteRC("Actual RE Counts: ", 12, 1);
     LCD.WriteRC(right_encoder.Counts(), 12, 20);
 }
 
 /*******************************************************
  * @brief Turns left a certain amount of degrees
  * 
- * @param percent 
- * @param degrees 
+ * @param percent - Percent for the motors to run at. Negative for reverse.
+ * @param degrees - Degrees to rotate.
  */
 void turn_left_degrees(int percent, float degrees) {
     // Calculates desired counts based on the radius of the wheels and the robot
@@ -191,7 +222,11 @@ void turn_left_degrees(int percent, float degrees) {
     left_encoder.ResetCounts();
 
     // Sets both motors to specific percentage
-    right_motor.SetPercent(percent);
+    if (INVERSED_WHEEL) {
+        right_motor.SetPercent(-percent);
+    } else {
+        right_motor.SetPercent(percent);
+    }
     left_motor.SetPercent(-percent);
 
     // Keeps running until average motor counts are in proper range
@@ -202,15 +237,14 @@ void turn_left_degrees(int percent, float degrees) {
     left_motor.Stop();
     
     //Print out data
-    LCD.WriteRC("Theoretical Counts: ", 9, 2);
+    LCD.WriteRC("Theoretical Counts: ", 9, 1);
     LCD.WriteRC(expectedCounts, 9, 20);
-    LCD.WriteRC("Motor Percent: ", 10, 2);
+    LCD.WriteRC("Motor Percent: ", 10, 1);
     LCD.WriteRC(percent, 10, 20);
-    LCD.WriteRC("Actual LE Counts: ", 11, 2);
+    LCD.WriteRC("Actual LE Counts: ", 11, 1);
     LCD.WriteRC(left_encoder.Counts(), 11, 20);
-    LCD.WriteRC("Actual RE Counts: ", 12, 2);
+    LCD.WriteRC("Actual RE Counts: ", 12, 1);
     LCD.WriteRC(right_encoder.Counts(), 12, 20);
-    
 }
 
 /*******************************************************
@@ -219,6 +253,7 @@ void turn_left_degrees(int percent, float degrees) {
  * @return int color Color detected.
  *          0 -> Red
  *          1 -> Blue
+ * @param timeToDetect time the robot takes to detect if it doesn't see the color right away
  */
 int detectColor(int timeToDetect) {
     LCD.Clear();
@@ -238,6 +273,20 @@ int detectColor(int timeToDetect) {
     // Reads values for four seconds OR until color is found
     while (( (TimeNow() - startTime) < timeToDetect) && !colorFound) {
         
+        // Takes the average value read
+        sum += CdS_cell.Value();
+        numValues++;
+        averageValue = sum / numValues;
+
+        // Detects color using CdS_cell values
+        if (std::abs(CdS_cell.Value() - 0.25) < 0.2) {
+                color = 0;
+                colorFound = 1;
+        } else if (std::abs(CdS_cell.Value() - 0.65) < 0.2) {
+                color = 1;
+                colorFound = 1;
+        }
+
         // Prints out info
         LCD.SetBackgroundColor(BACKGROUND_COLOR);
         LCD.SetFontColor(FONT_COLOR);
@@ -267,20 +316,6 @@ int detectColor(int timeToDetect) {
         default:
             LCD.WriteRC("Other", 5, 15);
             break;
-        }
-        
-        // Takes the average value read
-        sum += CdS_cell.Value();
-        numValues++;
-        averageValue = sum / numValues;
-
-        // Detects color using CdS_cell values
-        if (std::abs(CdS_cell.Value() - 0.25) < 0.2) {
-                color = 0;
-                colorFound = 1;
-        } else if (std::abs(CdS_cell.Value() - 0.65) < 0.2) {
-                color = 1;
-                colorFound = 1;
         }
 
         // Prints out the average value
@@ -493,11 +528,17 @@ void runCourse(int courseNumber) {
 
         // Heads from button to center
         move_forward_inches(20, 7.5);
+        Sleep(1.0);
 
         // Moves towards jukebox
         turn_left_degrees(20, 45);
+        Sleep(1.0);
+
         move_forward_inches(20, 11.9);
+        Sleep(1.0);
+
         turn_left_degrees(20, 90);
+        Sleep(1.0);
 
         writeStatus("Pressing jukebox buttons");
         
@@ -508,30 +549,43 @@ void runCourse(int courseNumber) {
 
         // Moves to center (aligns with ramp)
         move_forward_inches(20, 9);
+        Sleep(1.0);
         turn_left_degrees(20, 90);
+        Sleep(1.0);
         
         writeStatus("Moving up ramp");
 
         // Moves up ramp
         move_forward_inches(20, 11);
+        Sleep(1.0);
         move_forward_inches(20, 10);
+        Sleep(1.0);
         move_forward_inches(20, 14);
+        Sleep(1.0);
         turn_right_degrees(20, 180);
+        Sleep(1.0);
 
         writeStatus("Moving down ramp");
         
         // Moves down ramp
         move_forward_inches(20, 14);
+        Sleep(1.0);
         move_forward_inches(20, 10);
+        Sleep(1.0);
         move_forward_inches(20, 11);
+        Sleep(1.0);
 
         writeStatus("Towards final button");
 
         // Heads toward final button
         turn_left_degrees(20, 90);
+        Sleep(1.0);
         move_forward_inches(20, 2.9);
+        Sleep(1.0);
         turn_right_degrees(20, 45);
+        Sleep(1.0);
         move_forward_inches(20, 7.5);
+        Sleep(1.0);
 
         writeStatus("Woo?");
 
@@ -574,11 +628,22 @@ void runCourse(int courseNumber) {
  */
 int main() {
 
+    float xTrash, yTrash;
+
     // Initializes screen
     startUp();
 
     // Runs specified course number.
-    runCourse(1);
+    // runCourse(1);
+
+    //Waits until touch
+    while(!LCD.Touch(&xTrash, &yTrash));
+
+    Sleep(1.0);
+    
+    turn_right_degrees(20, 180);
+
+    //runCourse(1);
 
     return 0;
 }

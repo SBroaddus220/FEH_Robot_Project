@@ -12,15 +12,15 @@
 /*
  * TO DO:
  *
- * 1. See start light with function
+ * 1. See start light with function done
  * 
- * 2. Test jukebox button function
+ * 2. Test jukebox button function done
  *
- * 3. Test code to get to jukebox sensor
+ * 3. Test code to get to jukebox sensor done
  * 
- * 4. Test code to get to ramp from jukebox
+ * 4. Test code to get to ramp from jukebox done
  * 
- * 5. Test code to go up ramp
+ * 5. Test code to go up ramp done
  * 
  * 6. Implement RPS checking when QR code is added
  * 
@@ -35,7 +35,7 @@
 #include <cmath> // abs() 
 
 // Definitions
-#define ROBOT_WIDTH 7.625 // Length of front/back side of robot in inches
+#define ROBOT_WIDTH 7.4 // Length of front/back side of robot in inches
 #define PI 3.14159265
 #define BACKGROUND_COLOR WHITE // Background color of layout
 #define FONT_COLOR BLACK // Font color of layout
@@ -52,7 +52,7 @@
  * true -> Our robot
  * false -> Crayola bot
  */ 
-#define INVERSED_WHEEL false
+#define INVERSED_WHEEL true
 
 /*
  * Number of encoder counts per inch.
@@ -94,9 +94,35 @@ int startUp()
     LCD.SetFontColor(FONT_COLOR);
     LCD.Clear();
     writeStatus("Press to run...");
-    Sleep(1.0);
 
     return 0;
+}
+
+/*******************************************************
+ * @brief Waits until the start light to run the course
+ * 
+ * @return int The status of the light
+ *         1 -> ON
+ *         0 -> OFF
+ */
+int readStartLight() {
+    LCD.Clear();
+
+    int lightOn = 0;
+
+    writeStatus("Waiting for light");
+
+    // Waits until light is detected
+    while (!lightOn) {
+        // Writes out CdS value to the screen
+        LCD.WriteRC("CdS Value: ", 7, 2);
+        LCD.WriteRC(CdS_cell.Value(), 7, 20);
+
+        if (std::abs(CdS_cell.Value() - 0.25) < 0.2) {
+            lightOn = 1;
+            writeStatus("GO!");
+        }
+    }
 }
 
 /*******************************************************
@@ -117,7 +143,7 @@ void move_forward_inches(int percent, float inches)
     LCD.DrawHorizontalLine(100, 0, 319);
 
     // Writes out status to the screen
-    LCD.WriteRC("Moving forward...", 7, 2);
+    LCD.WriteRC("Moving forward...", 7, 1);
 
     // Resets encoder counts
     right_encoder.ResetCounts();
@@ -280,11 +306,13 @@ int detectColor(int timeToDetect) {
 
         // Detects color using CdS_cell values
         if (std::abs(CdS_cell.Value() - 0.25) < 0.2) {
-                color = 0;
-                colorFound = 1;
+            color = 0;
+            colorFound = 1;
         } else if (std::abs(CdS_cell.Value() - 0.65) < 0.2) {
-                color = 1;
-                colorFound = 1;
+            color = 1;
+            colorFound = 1;
+        } else {
+            color = 0; // Default is red
         }
 
         // Prints out info
@@ -344,27 +372,30 @@ void pressJukeboxButtons() {
 
     // Responds to the jukebox light appropriately
     if (color == 0) { // On right path (red light)
-        turn_right_degrees(20, 35);
+        turn_right_degrees(20, 45);
         move_forward_inches(20, 2.75);
-        turn_right_degrees(20, 35);
+        turn_left_degrees(20, 45);
         move_forward_inches(20, 4.5); // Moves until button is pressed
         Sleep(2.0);
-        move_forward_inches(20, -4.5); // Reverses
-        turn_left_degrees(20, 155);
-        move_forward_inches(20, 2.75);
-        turn_right_degrees(20, 65);
+        move_forward_inches(-20, 4.5); // Reverses
+        
+        turn_right_degrees(20, 45);
+        move_forward_inches(-20, 2.75);
+        turn_left_degrees(20, 45);
+        
 
     } else if (color == 1) { // On left path (blue light)
 
-        turn_left_degrees(20, 35);
+        turn_left_degrees(20, 45);
         move_forward_inches(20, 2.75);
-        turn_right_degrees(20, 35);
+        turn_right_degrees(20, 45);
         move_forward_inches(20, 4.5); // Moves until button is pressed
         Sleep(2.0);
-        move_forward_inches(20, -4.5);
-        turn_left_degrees(20, 155);
-        move_forward_inches(20, 2.75);
-        turn_right_degrees(20, 65);
+        move_forward_inches(-20, 4.5);
+
+        turn_left_degrees(20, 45);
+        move_forward_inches(-20, 2.75);
+        turn_right_degrees(20, 45);
 
     } else {
         LCD.Write("ERROR: COLOR NOT READ SUCCESFULLY");
@@ -449,6 +480,7 @@ void runCourse(int courseNumber) {
     case 1: // Performance Test 1
 
         /*****
+         * THIS PSEUDO-CODE NEEDS UPDATING
          * Algorithm for performance test 1:
          * All degree measurements are CCW from +x
          * 
@@ -548,6 +580,8 @@ void runCourse(int courseNumber) {
         writeStatus("Moving towards ramp");
 
         // Moves to center (aligns with ramp)
+        turn_left_degrees(20, 90);
+        Sleep(1.0);
         move_forward_inches(20, 9);
         Sleep(1.0);
         turn_left_degrees(20, 90);
@@ -632,16 +666,24 @@ int main() {
 
     // Initializes screen
     startUp();
+    Sleep(1.0);
+
+    // Waits until start light is read
+    //readStartLight();
+    //Sleep(1.0);
 
     // Runs specified course number.
     // runCourse(1);
 
-    //Waits until touch
-    while(!LCD.Touch(&xTrash, &yTrash));
-
-    Sleep(1.0);
+    while(true) {
+        move_forward_inches(20, 2);
+    }
+    // detectColor(99);
+    // Sleep(1.0);
     
-    turn_right_degrees(20, 180);
+    // turn_right_degrees(20, 90);
+
+    //pressJukeboxButtons();
 
     //runCourse(1);
 

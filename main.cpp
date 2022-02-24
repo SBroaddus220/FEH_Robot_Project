@@ -26,6 +26,9 @@
  * 
  */ 
 
+// CdS cell 5 3/8 from back edge
+// Wheel axle 1 1/4 from back edge 5.375-1.25
+
 // Include preprocessor directives
 #include <FEHLCD.h>
 #include <FEHIO.h>
@@ -35,13 +38,22 @@
 #include <cmath> // abs() 
 
 // Definitions
-#define ROBOT_WIDTH 7.4 // Length of front/back side of robot in inches
+#define ROBOT_WIDTH 7.95 // Length of front/back side of OUR robot in inches
+//#define ROBOT_WIDTH 7.0 // CRAYOLA BOT
 #define PI 3.14159265
 #define BACKGROUND_COLOR WHITE // Background color of layout
 #define FONT_COLOR BLACK // Font color of layout
+#define RIGHT_MOTOR_CALIBRATOR 1 // Percent difference needed to go straight
+#define TURN_CALIBRATOR 1 // Degrees less to turn to calibrate
 
-// Courses 
-#define TEST_COURSE 0 // Number of course for testing
+/*
+ * Distance from the center of the wheel axis to the CdS cell.
+ * Used to map out course.
+ * 
+ * (DIST_CDS_CELL_BACK_EDGE - DIST_WHEEL_AXLE_BACK_EDGE)
+ */ 
+#define DIST_AXIS_CDS (5.375 - 1.25) // OUR BOT
+//#define DIST_AXIS_CDS (4.25 - 1.75) // CRAYOLA BOT
 
 /*
  * One of our motors is inversed, so it'll be different than test code with the Crayola bot. 
@@ -76,11 +88,11 @@ void runCourse(); // Runs the course specified by startUp()
 // Declarations for encoders/motors
 DigitalEncoder right_encoder(FEHIO::P0_0);
 DigitalEncoder left_encoder(FEHIO::P0_1);
-FEHMotor right_motor(FEHMotor::Motor0,9.0);
-FEHMotor left_motor(FEHMotor::Motor1,9.0);
+FEHMotor right_motor(FEHMotor::Motor2,9.0);
+FEHMotor left_motor(FEHMotor::Motor3,9.0);
 
 // Declaration for CdS cell sensorsad 
-AnalogInputPin CdS_cell(FEHIO::P0_2);
+AnalogInputPin CdS_cell(FEHIO::P1_0);
 
 /*******************************************************
  * @brief Initializes the screen and asks for what to do
@@ -94,6 +106,10 @@ int startUp()
     LCD.SetFontColor(FONT_COLOR);
     LCD.Clear();
     writeStatus("Press to run...");
+
+    // Waits for a touch
+    int xTrash, yTrash;
+    while(!LCD.Touch(&xTrash, &yTrash));
 
     return 0;
 }
@@ -151,9 +167,9 @@ void move_forward_inches(int percent, float inches)
 
     // Sets both motors to same percentage
     if (INVERSED_WHEEL) {
-        right_motor.SetPercent(-percent);
+        right_motor.SetPercent(-percent - RIGHT_MOTOR_CALIBRATOR);
     } else {
-        right_motor.SetPercent(percent);
+        right_motor.SetPercent(percent + RIGHT_MOTOR_CALIBRATOR);
     }
     left_motor.SetPercent(percent);
 
@@ -182,6 +198,9 @@ void move_forward_inches(int percent, float inches)
  * @param degrees - Degrees to rotate.
  */
 void turn_right_degrees(int percent, float degrees) {
+
+    percent -= TURN_CALIBRATOR;
+
     // Calculates desired counts based on the radius of the wheels and the robot
     float expectedCounts = COUNT_PER_INCH * ((degrees * PI) / 180.0) * (ROBOT_WIDTH / 2);
 
@@ -231,6 +250,9 @@ void turn_right_degrees(int percent, float degrees) {
  * @param degrees - Degrees to rotate.
  */
 void turn_left_degrees(int percent, float degrees) {
+
+    percent -= TURN_CALIBRATOR;
+
     // Calculates desired counts based on the radius of the wheels and the robot
     float expectedCounts = COUNT_PER_INCH * ((degrees * PI) / 180.0) * (ROBOT_WIDTH / 2);
 
@@ -305,10 +327,10 @@ int detectColor(int timeToDetect) {
         averageValue = sum / numValues;
 
         // Detects color using CdS_cell values
-        if (std::abs(CdS_cell.Value() - 0.25) < 0.2) {
+        if (CdS_cell.Value() < 0.345) {
             color = 0;
             colorFound = 1;
-        } else if (std::abs(CdS_cell.Value() - 0.65) < 0.2) {
+        } else if (CdS_cell.Value() > 0.345) {
             color = 1;
             colorFound = 1;
         } else {
@@ -372,30 +394,64 @@ void pressJukeboxButtons() {
 
     // Responds to the jukebox light appropriately
     if (color == 0) { // On right path (red light)
-        turn_right_degrees(20, 45);
+        turn_right_degrees(20, 35);
         move_forward_inches(20, 2.75);
-        turn_left_degrees(20, 45);
-        move_forward_inches(20, 4.5); // Moves until button is pressed
+        turn_left_degrees(20, 35);
+
+
+        float startTime = TimeNow();
+
+        while (TimeNow() - startTime < 1.0) {
+            // Sets both motors to same percentage
+            if (INVERSED_WHEEL) {
+                right_motor.SetPercent(-20 - RIGHT_MOTOR_CALIBRATOR);
+            } else {
+                right_motor.SetPercent(20 + RIGHT_MOTOR_CALIBRATOR);
+            }
+            left_motor.SetPercent(20);
+        }
+
+        right_motor.Stop();
+        left_motor.Stop();
+
+
         Sleep(2.0);
-        move_forward_inches(-20, 4.5); // Reverses
-        
-        turn_right_degrees(20, 45);
+
+        // Reverses
+        move_forward_inches(-20, 4.5); 
+        turn_right_degrees(20, 35);
         move_forward_inches(-20, 2.75);
-        turn_left_degrees(20, 45);
+        turn_left_degrees(20, 37.5);
         
 
     } else if (color == 1) { // On left path (blue light)
 
-        turn_left_degrees(20, 45);
+        turn_left_degrees(20, 35);
         move_forward_inches(20, 2.75);
-        turn_right_degrees(20, 45);
-        move_forward_inches(20, 4.5); // Moves until button is pressed
-        Sleep(2.0);
-        move_forward_inches(-20, 4.5);
+        turn_right_degrees(20, 35);
 
-        turn_left_degrees(20, 45);
+        float startTime = TimeNow();
+
+        while (TimeNow() - startTime < 1.0) {
+            // Sets both motors to same percentage
+            if (INVERSED_WHEEL) {
+                right_motor.SetPercent(-20 - RIGHT_MOTOR_CALIBRATOR);
+            } else {
+                right_motor.SetPercent(20 + RIGHT_MOTOR_CALIBRATOR);
+            }
+            left_motor.SetPercent(20);
+        }
+
+        right_motor.Stop();
+        left_motor.Stop();
+
+        Sleep(2.0);
+
+        // Reverses
+        move_forward_inches(-20, 4.5);
+        turn_left_degrees(20, 35);
         move_forward_inches(-20, 2.75);
-        turn_right_degrees(20, 45);
+        turn_right_degrees(20, 37.5);
 
     } else {
         LCD.Write("ERROR: COLOR NOT READ SUCCESFULLY");
@@ -555,34 +611,47 @@ void runCourse(int courseNumber) {
         writeStatus("Running Perf. Test 1");
 
         Sleep(1.0);
+        
+        /***************************************************/
 
         writeStatus("Moving towards jukebox");
 
         // Heads from button to center
-        move_forward_inches(20, 7.5);
+        move_forward_inches(20, 7.5 + DIST_AXIS_CDS); // Direct: 7.5 inches 
         Sleep(1.0);
 
         // Moves towards jukebox
-        turn_left_degrees(20, 45);
+        turn_left_degrees(20, 43.5);
         Sleep(1.0);
 
-        move_forward_inches(20, 11.9);
+        move_forward_inches(20, 12);
         Sleep(1.0);
 
-        turn_left_degrees(20, 90);
+        turn_left_degrees(20, 89);
         Sleep(1.0);
+
+        //Reverses to move CdS cell over jukebox light
+        move_forward_inches(-20, 0.75 + DIST_AXIS_CDS);
+        
+       /***************************************************/
 
         writeStatus("Pressing jukebox buttons");
         
+        
         // Presses jukebox buttons
         pressJukeboxButtons();
+        
+        /***************************************************/
+
+        // Moves forward to move wheel axis over jukebox light
+        move_forward_inches(20, DIST_AXIS_CDS);
 
         writeStatus("Moving towards ramp");
 
         // Moves to center (aligns with ramp)
         turn_left_degrees(20, 90);
         Sleep(1.0);
-        move_forward_inches(20, 9);
+        move_forward_inches(20, 9 + DIST_AXIS_CDS);
         Sleep(1.0);
         turn_left_degrees(20, 90);
         Sleep(1.0);
@@ -590,31 +659,21 @@ void runCourse(int courseNumber) {
         writeStatus("Moving up ramp");
 
         // Moves up ramp
-        move_forward_inches(20, 11);
-        Sleep(1.0);
-        move_forward_inches(20, 10);
-        Sleep(1.0);
-        move_forward_inches(20, 14);
-        Sleep(1.0);
-        turn_right_degrees(20, 180);
+        move_forward_inches(20, 35); // 11 + 10 + 14
         Sleep(1.0);
 
         writeStatus("Moving down ramp");
         
         // Moves down ramp
-        move_forward_inches(20, 14);
-        Sleep(1.0);
-        move_forward_inches(20, 10);
-        Sleep(1.0);
-        move_forward_inches(20, 11);
+        move_forward_inches(-20, 35);
         Sleep(1.0);
 
         writeStatus("Towards final button");
 
         // Heads toward final button
-        turn_left_degrees(20, 90);
+        turn_right_degrees(20, 90);
         Sleep(1.0);
-        move_forward_inches(20, 2.9);
+        move_forward_inches(20, 2.9 + DIST_AXIS_CDS);
         Sleep(1.0);
         turn_right_degrees(20, 45);
         Sleep(1.0);
@@ -622,8 +681,9 @@ void runCourse(int courseNumber) {
         Sleep(1.0);
 
         writeStatus("Woo?");
-
+        
         break;
+        
 
     case 2: // Performance Test 2
         LCD.Clear();
@@ -668,24 +728,13 @@ int main() {
     startUp();
     Sleep(1.0);
 
-    // Waits until start light is read
+    //Waits until start light is read
     //readStartLight();
     //Sleep(1.0);
 
     // Runs specified course number.
-    // runCourse(1);
-
-    while(true) {
-        move_forward_inches(20, 2);
-    }
-    // detectColor(99);
-    // Sleep(1.0);
-    
-    // turn_right_degrees(20, 90);
-
-    //pressJukeboxButtons();
-
-    //runCourse(1);
+    runCourse(1);
+    //turn_left_degrees(20, 180);
 
     return 0;
 }

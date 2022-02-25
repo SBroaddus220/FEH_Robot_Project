@@ -418,10 +418,21 @@ void pressJukeboxButtons() {
         Sleep(2.0);
 
         // Reverses
-        move_forward_inches(-20, 4.5); 
+        startTime = TimeNow();
+
+        while (TimeNow() - startTime < 1.0) {
+            // Sets both motors to same percentage
+            if (INVERSED_WHEEL) {
+                right_motor.SetPercent(20 - RIGHT_MOTOR_CALIBRATOR);
+            } else {
+                right_motor.SetPercent(-20 + RIGHT_MOTOR_CALIBRATOR);
+            }
+            left_motor.SetPercent(-20);
+        }
+
         turn_right_degrees(20, 35);
         move_forward_inches(-20, 2.75);
-        turn_left_degrees(20, 37.5);
+        turn_left_degrees(20, 35);
         
 
     } else if (color == 1) { // On left path (blue light)
@@ -448,10 +459,22 @@ void pressJukeboxButtons() {
         Sleep(2.0);
 
         // Reverses
-        move_forward_inches(-20, 4.5);
+        startTime = TimeNow();
+
+        while (TimeNow() - startTime < 1.0) {
+            // Sets both motors to same percentage
+            if (INVERSED_WHEEL) {
+                right_motor.SetPercent(20 - RIGHT_MOTOR_CALIBRATOR);
+            } else {
+                right_motor.SetPercent(-20 + RIGHT_MOTOR_CALIBRATOR);
+            }
+            left_motor.SetPercent(-20);
+        }
+
+
         turn_left_degrees(20, 35);
         move_forward_inches(-20, 2.75);
-        turn_right_degrees(20, 37.5);
+        turn_right_degrees(20, 35);
 
     } else {
         LCD.Write("ERROR: COLOR NOT READ SUCCESFULLY");
@@ -617,11 +640,11 @@ void runCourse(int courseNumber) {
         writeStatus("Moving towards jukebox");
 
         // Heads from button to center
-        move_forward_inches(20, 7.5 + DIST_AXIS_CDS); // Direct: 7.5 inches 
+        move_forward_inches(20, 8.0 + DIST_AXIS_CDS); // Direct: 7.5 inches 
         Sleep(1.0);
 
         // Moves towards jukebox
-        turn_left_degrees(20, 43.5);
+        turn_left_degrees(20, 43);
         Sleep(1.0);
 
         move_forward_inches(20, 12);
@@ -632,7 +655,8 @@ void runCourse(int courseNumber) {
 
         //Reverses to move CdS cell over jukebox light
         move_forward_inches(-20, 0.75 + DIST_AXIS_CDS);
-        
+    
+
        /***************************************************/
 
         writeStatus("Pressing jukebox buttons");
@@ -649,9 +673,9 @@ void runCourse(int courseNumber) {
         writeStatus("Moving towards ramp");
 
         // Moves to center (aligns with ramp)
-        turn_left_degrees(20, 90);
+        turn_left_degrees(20, 85);
         Sleep(1.0);
-        move_forward_inches(20, 9 + DIST_AXIS_CDS);
+        move_forward_inches(20, 9);
         Sleep(1.0);
         turn_left_degrees(20, 90);
         Sleep(1.0);
@@ -659,13 +683,13 @@ void runCourse(int courseNumber) {
         writeStatus("Moving up ramp");
 
         // Moves up ramp
-        move_forward_inches(20, 35); // 11 + 10 + 14
+        move_forward_inches(35, 35); // 11 + 10 + 14
         Sleep(1.0);
 
         writeStatus("Moving down ramp");
         
         // Moves down ramp
-        move_forward_inches(-20, 35);
+        move_forward_inches(-35, 35);
         Sleep(1.0);
 
         writeStatus("Towards final button");
@@ -673,7 +697,7 @@ void runCourse(int courseNumber) {
         // Heads toward final button
         turn_right_degrees(20, 90);
         Sleep(1.0);
-        move_forward_inches(20, 2.9 + DIST_AXIS_CDS);
+        move_forward_inches(20, 2.9);
         Sleep(1.0);
         turn_right_degrees(20, 45);
         Sleep(1.0);
@@ -729,8 +753,8 @@ int main() {
     Sleep(1.0);
 
     //Waits until start light is read
-    //readStartLight();
-    //Sleep(1.0);
+    readStartLight();
+    Sleep(1.0);
 
     // Runs specified course number.
     runCourse(1);

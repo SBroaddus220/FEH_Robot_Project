@@ -533,6 +533,35 @@ void writeStatus(char status[]) {
 }
 
 /*******************************************************
+ * @brief Shows the current RPS data.
+ * 
+ * @pre RPS must be initialized.
+ * 
+ */
+void showRPSData() {
+
+    LCD.DrawHorizontalLine(100, 0, 319);
+
+    // Writes the data from the RPS
+    writeStatus("Reading RPS Data");
+
+    LCD.WriteRC("Heading: ", 7, 1);
+    LCD.WriteRC(RPS.Heading(), 7, 10);
+
+    LCD.WriteRC("X Value: ", 8, 1);
+    LCD.WriteRC(RPS.X(), 8, 10);
+
+    LCD.WriteRC("Y Value: ", 9, 1);
+    LCD.WriteRC(RPS.Y(), 9, 10);
+
+    LCD.WriteRC("Time: ", 10, 1);
+    LCD.WriteRC(RPS.Time(), 10, 10);
+
+    LCD.WriteRC("Course: ", 11, 1);
+    LCD.WriteRC(RPS.CurrentRegionLetter(), 11, 10);
+}
+
+/*******************************************************
  * @brief Runs the specified course
  * @author Steven Broaddus
  * @param courseNumber Course number to runs
@@ -752,13 +781,15 @@ int main() {
     startUp();
     Sleep(1.0);
 
+    // Initializes RPS
+    RPS.InitializeTouchMenu();
+
     //Waits until start light is read
     readStartLight();
     Sleep(1.0);
 
     // Runs specified course number.
     runCourse(1);
-    //turn_left_degrees(20, 180);
 
     return 0;
 }

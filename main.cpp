@@ -877,26 +877,25 @@ void runCourse(int courseNumber) {
      * writeStatus() is used to print what the robot is doing without 
      * clearing the movement status (turn left/right etc..)
      */
+
+    // Creates room for status messages
+    LCD.Clear();
     
     switch (courseNumber)
     {
     case TEST_COURSE_1: // Test course 1
-        LCD.Clear();
         LCD.Write("Running Test Course 1");
         break;
 
     case TEST_COURSE_2: // Test course 1
-        LCD.Clear();
         LCD.Write("Running Test Course 2");
         break;
 
     case TEST_COURSE_3: // Test course 1
-        LCD.Clear();
         LCD.Write("Running Test Course 3");
         break;
 
     case CALIBRATE_SERVOS:
-        LCD.Clear();
         LCD.Write("Calibrating Servos");
         break;
 
@@ -1045,32 +1044,26 @@ void runCourse(int courseNumber) {
         
 
     case PERF_COURSE_2: // Performance Test 2
-        LCD.Clear();
         LCD.Write("Running Performance Test 2");
         break;
 
     case PERF_COURSE_3: // Performance Test 3
-        LCD.Clear();
         LCD.Write("Running Performance Test 3");
         break;
 
     case PERF_COURSE_4: // Performance Test 4
-        LCD.Clear();
         LCD.Write("Running Performance Test 4");
         break;
 
     case IND_COMP: // Individual Competition
-        LCD.Clear();
         LCD.Write("Running Ind. Competition");
         break;
 
     case FINAL_COMP: // Final Competition
-        LCD.Clear();
         LCD.Write("Running Final Competition");
         break;
     
     default:
-        LCD.Clear();
         LCD.WriteRC("ERROR: NO COURSE SPECIFIED", 1, 0);
         break;
     }

@@ -5,29 +5,9 @@
 /*      Steven Broaddus, Conolly Burgess     */
 /*        Joseph Richmond, Jake Chang        */
 /*                                           */
-/*            Updated 2/23/2022              */
+/*            Updated 2/27/2022              */
 /*       Uses Doxygen for documentation      */
 /*********************************************/
-
-/*
- * TO DO:
- *
- * 1. See start light with function done
- * 
- * 2. Test jukebox button function done
- *
- * 3. Test code to get to jukebox sensor done
- * 
- * 4. Test code to get to ramp from jukebox done
- * 
- * 5. Test code to go up ramp done
- * 
- * 6. Implement RPS checking when QR code is added
- * 
- */ 
-
-// CdS cell 5 3/8 from back edge
-// Wheel axle 1 1/4 from back edge 5.375-1.25
 
 // Include preprocessor directives
 #include <FEHLCD.h>
@@ -45,6 +25,9 @@
 #define FONT_COLOR BLACK // Font color of layout
 #define RIGHT_MOTOR_CALIBRATOR 1 // Percent difference needed to go straight
 #define TURN_CALIBRATOR 1 // Degrees less to turn to calibrate
+
+// Time to sleep (seconds) after button pressed for accessibility
+#define BUTTON_TIME_TO_SLEEP 0.20
 
 /*
  * Distance from the center of the wheel axis to the CdS cell.
@@ -73,17 +56,33 @@
  */ 
 #define COUNT_PER_INCH (318 / (2 * 3.14159265 * 1.25)) // Number of encoder counts per inch
 
+// Course numbers. Used in startMenu() and runCourse()
+enum { 
+            TEST_COURSE_1 = 1, 
+            TEST_COURSE_2 = 2, 
+            TEST_COURSE_3 = 3, 
+            CALIBRATE_SERVOS = 4,
+            PERF_COURSE_1 = 5, 
+            PERF_COURSE_2 = 6, 
+            PERF_COURSE_3 = 7, 
+            PERF_COURSE_4 = 8, 
+            IND_COMP = 9, 
+            FINAL_COMP = 10
+         };
+
 // Function Prototypes
-int startUp(); // Sets the screen and asks the user for the next step
+int confirmation(char prompt[], int xPrompt, int yPrompt); // Prompts the user to confirm a choice
+void drawMainMenuScreen(FEHIcon::Icon test_button, FEHIcon::Icon perf_test_button, FEHIcon::Icon competition_button); // Draws the main menu screen
+int startMenu(); // Sets up a starting menu for the user.
+int readStartLight(); // Waits for the start light
 void move_forward_inches(int percent, float inches); // Moves forward number of inches
 void turn_right_degrees(int percent, float degrees); // Turns right a specified number of degrees
 void turn_left_degrees(int percent, float degrees); // Turns left a specified amount of degrees
 int detectColor(int timeToDetect); // Detects the color of the jukebox
 void pressJukeboxButtons(); // Presses the jukebox buttons
-int yesOrNo(char question[], int xLoc, int yLoc); // Asks a yes/no question
 void writeStatus(char status[]); // Clears room for a printed string w/o clearing display
+void showRPSData(); // Shows basic RPS data for the robot
 void runCourse(); // Runs the course specified by startUp()
-
 
 // Declarations for encoders/motors
 DigitalEncoder right_encoder(FEHIO::P0_0);
@@ -95,23 +94,364 @@ FEHMotor left_motor(FEHMotor::Motor3,9.0);
 AnalogInputPin CdS_cell(FEHIO::P1_0);
 
 /*******************************************************
- * @brief Initializes the screen and asks for what to do
- * @author Steven Broaddus
- * @return Course number to run
+ * @brief Prompts the user to confirm their choice.
+ * 
+ * @param prompt Prompt for the user to confirm.
+ * @param xPrompt X RC (Rows/Columns, see LCD.WriteRC documentation) to write at.
+ * @param yPrompt Same as xPrompt, but y RC coord.
+ * @return int The value of the user's decision. 
+ *          Yes -> 1 (true)
+ *          No  -> 0 (false)
  */
-int startUp() 
-{
+int confirmation(char prompt[], int xPrompt, int yPrompt) {
+
+    enum { 
+            YES = true, 
+            NO = false
+         };
+
+    // Coords of touch 
+    int xTouch, yTouch;
+
+    // Selection to check buttons
+    int selection;
+
+    // Initiates decision to invalid value
+    int decision = -1;
+
+    // Icons to display choices
+    FEHIcon::Icon confirm[2];
+    char confirm_labels[2][20] = {"Yes", "No"};
+
+    // Sleeps to show "pressed" status of other buttons
+    Sleep(BUTTON_TIME_TO_SLEEP);
+    LCD.ClearBuffer();
+
+    // Draws choices and prompt
+    LCD.Clear();
+
+    // Writes the passed-in prompt at the x, y RC coords
+    LCD.WriteRC(prompt, xPrompt, yPrompt);
+
+    FEHIcon::DrawIconArray(confirm, 1, 2, 100, 50, 50, 50, confirm_labels, FONT_COLOR, FONT_COLOR);
+
+    // Waits a bit to not suddenly allow for a choice
+    Sleep(BUTTON_TIME_TO_SLEEP);
+    LCD.ClearBuffer();
+
+    // While decision hasn't been made, wait for touch
+    while (decision == -1)  
+    {
+        // Waits for touch and loops through buttons to see if they were pressed
+        if (LCD.Touch(&xTouch, &yTouch)) {
+            for (int i = 0; i < 2; i++) {
+                if (confirm[i].Pressed(xTouch, yTouch, 0)) {
+                    selection = i + 1;
+                }
+            }
+        }
+
+        // Checks which button has been pressed
+        switch (selection) {
+            case 1:
+                decision = YES;
+                break;
+            case 2:
+                decision = NO;
+                break;
+        }
+    }
+
+    return decision;
+}
+
+/*******************************************************
+ * @brief Draws the main menu screen. In a function for re-use.
+ * 
+ * @param test_button Button that leads to the test menu
+ * @param perf_test_button Button that leads to the performance test menu
+ * @param competition_button Button that leads to the competition test menu
+ */
+void drawMainMenuScreen(FEHIcon::Icon test_button, FEHIcon::Icon perf_test_button, FEHIcon::Icon competition_button) {
+    
+    // Sleeps to show "pressed" status of other buttons
+    Sleep(BUTTON_TIME_TO_SLEEP);
+    LCD.ClearBuffer();
+
+    LCD.Clear();
+
+    // Prompts the user for selection
+    LCD.WriteRC("What do?", 2, 9);
+
+    // Draws the passed-in icons
+    test_button.Draw(); 
+    perf_test_button.Draw(); 
+    competition_button.Draw(); 
+
+    // Waits a bit to not suddenly allow for a choice
+    Sleep(BUTTON_TIME_TO_SLEEP);
+    LCD.ClearBuffer();
+}
+
+/*******************************************************
+ * @brief Initializes the starting menu to choose a course.
+ * 
+ * @return int Course chosen, see defined course number enum.
+ */
+int startMenu() {
+    
+    // Coordinates for touch
+    float xTouch, yTouch; 
+
+    // Enums for menus
+    enum { MAIN_MENU, TEST_MENU, PERFORMANCE_MENU, COMPETITION_MENU };
+
     // Initializes the screen
     LCD.SetBackgroundColor(BACKGROUND_COLOR);
     LCD.SetFontColor(FONT_COLOR);
     LCD.Clear();
-    writeStatus("Press to run...");
 
-    // Waits for a touch
-    int xTrash, yTrash;
-    while(!LCD.Touch(&xTrash, &yTrash));
+    // Creates main menu icons
+    FEHIcon::Icon test_button, perf_test_button, competition_button;
+    test_button.SetProperties("Test", 75, 75, 170, 40, FONT_COLOR, FONT_COLOR);
+    perf_test_button.SetProperties("Perf. Tests", 75, 125, 170, 40, FONT_COLOR, FONT_COLOR); 
+    competition_button.SetProperties("Competition", 75, 175, 170, 40, FONT_COLOR, FONT_COLOR); 
 
-    return 0;
+    // Creates button to calibrate servos
+    FEHIcon::Icon calibrate_servo_button;
+    calibrate_servo_button.SetProperties("Calibrate Servo", 50, 75, 220, 40, FONT_COLOR, FONT_COLOR);
+
+    // Assigns the labels for the different Tests
+    FEHIcon::Icon testButtons[3];
+    char test_button_labels[3][20] = {"1", "2", "3"};
+
+    FEHIcon::Icon performanceTests[4];
+    char performance_labels[4][20] = {"1", "2", "3", "4"};
+
+    FEHIcon::Icon competitions[2];
+    char competition_labels[2][20] = {"Ind.", "Final"};
+
+    // Used in while loop to check for decisions
+    int courseChosen = 0;
+    int selection;
+    int confirmed = false;
+
+    // Sets the screen to the default of the MAIN_MENU
+    int screen = MAIN_MENU;
+
+    // Draws the MAIN_MENU
+    drawMainMenuScreen(test_button, perf_test_button, competition_button);
+
+    // Repeats until the user hasn't chosen a course and confirmed it
+    while (!courseChosen && !confirmed) {
+        
+        // Checks buttons on MAIN_MENU
+        while (screen == MAIN_MENU && !courseChosen) {
+
+            if (LCD.Touch(&xTouch, &yTouch)) {
+
+                if (test_button.Pressed(xTouch, yTouch, 0)) 
+                { 
+                    Sleep(BUTTON_TIME_TO_SLEEP);
+                    LCD.Clear();
+                    screen = TEST_MENU;
+                    LCD.WriteRC("Tests!", 2, 10);
+                    FEHIcon::DrawIconArray(testButtons, 1, 3, 150, 50, 50, 50, test_button_labels, FONT_COLOR, FONT_COLOR);
+                    calibrate_servo_button.Draw();
+
+                    // Waits a bit to not suddenly allow for a choice
+                    Sleep(BUTTON_TIME_TO_SLEEP);
+                    LCD.ClearBuffer();
+                } 
+                if (perf_test_button.Pressed(xTouch, yTouch, 0)) 
+                { 
+                    Sleep(BUTTON_TIME_TO_SLEEP);
+                    LCD.Clear();
+                    screen = PERFORMANCE_MENU;
+                    LCD.WriteRC("Performance Tests", 1, 5);
+                    FEHIcon::DrawIconArray(performanceTests, 2, 2, 50, 25, 25, 25, performance_labels, FONT_COLOR, FONT_COLOR);
+
+                    // Waits a bit to not suddenly allow for a choice
+                    Sleep(BUTTON_TIME_TO_SLEEP);
+                    LCD.ClearBuffer();
+                } 
+                if (competition_button.Pressed(xTouch, yTouch, 0)) 
+                { 
+                    Sleep(BUTTON_TIME_TO_SLEEP);
+                    LCD.Clear();
+                    screen = COMPETITION_MENU;
+                    LCD.WriteRC("Competitions", 2, 7);
+                    FEHIcon::DrawIconArray(competitions, 1, 2, 75, 50, 50, 50, competition_labels, FONT_COLOR, FONT_COLOR);
+                    // Waits a bit to not suddenly allow for a choice
+                    Sleep(BUTTON_TIME_TO_SLEEP);
+                    LCD.ClearBuffer();
+                }
+            }
+        } // End MAIN_MENU button check
+
+        // Checks buttons on TEST_MENU
+        while (screen == TEST_MENU && !courseChosen) {
+            
+            // Initializes selection
+            selection = 0;
+            
+            // Loops through test button array upon touch
+            if (LCD.Touch(&xTouch, &yTouch)) {
+                for (int i = 0; i < 3; i++) {
+                    if (testButtons[i].Pressed(xTouch, yTouch, 0)) {
+                        selection = i+1;
+                    }
+                }
+
+                // Checks if calibrate servo button was pressed
+                if (calibrate_servo_button.Pressed(xTouch, yTouch, 0)) {
+                    selection = 4;
+                }
+
+                // Responds to which button was pressed
+                switch (selection) {
+                    case 1:
+                        if (confirmation("Test 1?", 3, 10)) {
+                            courseChosen = TEST_COURSE_1;
+                        } else {
+                            screen = MAIN_MENU;
+                            drawMainMenuScreen(test_button, perf_test_button, competition_button);
+                        }
+                        break;
+
+                    case 2:
+                        if (confirmation("Test 2?", 3, 10)) {
+                            courseChosen = TEST_COURSE_2;
+                        } else {
+                            screen = MAIN_MENU;
+                            drawMainMenuScreen(test_button, perf_test_button, competition_button);
+                        }
+                        break;
+                        
+                    case 3:
+                        if (confirmation("Test 3?", 3, 10)) {
+                            courseChosen = TEST_COURSE_3;
+                        } else {
+                            screen = MAIN_MENU;
+                            drawMainMenuScreen(test_button, perf_test_button, competition_button);
+                        }
+                        break;
+                    case 4:
+                        if (confirmation("Calibrate Servos?", 3, 5)) {
+                            courseChosen = CALIBRATE_SERVOS;
+                        } else {
+                            screen = MAIN_MENU;
+                            drawMainMenuScreen(test_button, perf_test_button, competition_button);
+                        }
+                        break;
+    
+                    default:
+                        continue;
+                }
+            }
+        } // End TEST_MENU button check
+
+        // Checks buttons on PERFORMANCE_MENU
+        while (screen == PERFORMANCE_MENU && !courseChosen) {
+
+            // Initializes selection
+            selection = 0;
+
+            // Loops through performance button array upon touch
+            if (LCD.Touch(&xTouch, &yTouch)) {
+                for (int i = 0; i < 4; i++) {
+                    if (performanceTests[i].Pressed(xTouch, yTouch, 0)) {
+                        selection = i+1;
+                    }
+                }
+
+                // Responds to which button was pressed
+                switch (selection) {
+                    case 1:
+                        if (confirmation("Perf. 1?", 3, 9)) {
+                            courseChosen = PERF_COURSE_1;
+                        } else {
+                            screen = MAIN_MENU;
+                            drawMainMenuScreen(test_button, perf_test_button, competition_button);
+                        }
+                        break;
+
+                    case 2:
+                        if (confirmation("Perf. 2?", 3, 9)) {
+                            courseChosen = PERF_COURSE_2;
+                        } else {
+                            screen = MAIN_MENU;
+                            drawMainMenuScreen(test_button, perf_test_button, competition_button);
+                        }
+                        break;
+
+                    case 3:
+                        if (confirmation("Perf. 3?", 3, 9)) {
+                            courseChosen = PERF_COURSE_3;
+                        } else {
+                            screen = MAIN_MENU;
+                            drawMainMenuScreen(test_button, perf_test_button, competition_button);
+                        }
+                        break;
+
+                    case 4:
+                        if (confirmation("Perf. 4?", 3, 9)) {
+                            courseChosen = PERF_COURSE_4;
+                        } else {
+                            screen = MAIN_MENU;
+                            drawMainMenuScreen(test_button, perf_test_button, competition_button);
+                        }
+                        break;
+                    default:
+                        continue;
+                }
+            }
+        } // End PERFORMANCE_MENU button check
+
+        // Checks buttons on COMPETITION_MENU
+        while (screen == COMPETITION_MENU && !courseChosen) {
+
+            // Initializes selection
+            selection = 0;
+
+            // Loops through performance button array upon touch
+            if (LCD.Touch(&xTouch, &yTouch)) {
+                for (int i = 0; i < 3; i++) {
+                    if (competitions[i].Pressed(xTouch, yTouch, 0)) {
+                        selection = i+1;
+                    }
+                }
+
+                // Responds to which button was pressed
+                switch (selection) {
+                    case 1:
+                        if (confirmation("Ind. Comp.?", 3, 8)) {
+                            courseChosen = IND_COMP;
+                        } else {
+                            screen = MAIN_MENU;
+                            drawMainMenuScreen(test_button, perf_test_button, competition_button);
+                        }
+                        break;
+
+                    case 2:
+                        if (confirmation("Final Comp.?", 3, 8)) {
+                            courseChosen = FINAL_COMP;
+                        } else {
+                            screen = MAIN_MENU;
+                            drawMainMenuScreen(test_button, perf_test_button, competition_button);
+                        }
+                        break;
+
+                    default:
+                        continue;
+                }
+            }
+        } // End COMPETITION_MENU button check
+        
+    }
+
+    return courseChosen;
+
 }
 
 /*******************************************************
@@ -482,44 +822,6 @@ void pressJukeboxButtons() {
 }
 
 /*******************************************************
- * @brief Asks the user a yes or no question, and returns the answer
- * @author Steven Broaddus
- * @param question Question that the user is asked
- * @param xLoc x-coordinate of text
- * @param yLoc y-coordinate of text
- * @return answer Returns 1 if yes, 0 if no
- */
-int yesOrNo(char question[], int xLoc, int yLoc) {
-
-    LCD.Clear();
-
-    // User's answer: 1 if yes, 0 if no
-    int answer = -1;
-    
-    // Touch coordinates
-    int xCoord, yCoord;
-
-    // Prompts user question
-    LCD.WriteRC(question, xLoc, yLoc);
-
-    LCD.WriteRC("Yes", 9, 5);
-    LCD.DrawVerticalLine(160, 90, 239);
-    LCD.WriteRC("No", 9, 19);
-    LCD.DrawHorizontalLine(90,0,319);
-
-    // Waits for an input and sees where it is
-    while(!LCD.Touch(&xCoord, &yCoord)) {
-        if (xCoord < 160) { // Yes
-                answer = 1;
-        } else if (xCoord > 160) { // No
-                answer = 0;
-            }  
-        }
-
-    return answer;
-}
-
-/*******************************************************
  * @brief Clears room for status and prints it to screen 
  * without clearing the screen
  * 
@@ -578,14 +880,27 @@ void runCourse(int courseNumber) {
     
     switch (courseNumber)
     {
-    case 0: // Test course
-        writeStatus("Running Test");
-
-        detectColor(99);
-        
+    case TEST_COURSE_1: // Test course 1
+        LCD.Clear();
+        LCD.Write("Running Test Course 1");
         break;
 
-    case 1: // Performance Test 1
+    case TEST_COURSE_2: // Test course 1
+        LCD.Clear();
+        LCD.Write("Running Test Course 2");
+        break;
+
+    case TEST_COURSE_3: // Test course 1
+        LCD.Clear();
+        LCD.Write("Running Test Course 3");
+        break;
+
+    case CALIBRATE_SERVOS:
+        LCD.Clear();
+        LCD.Write("Calibrating Servos");
+        break;
+
+    case PERF_COURSE_1: // Performance Test 1
 
         /*****
          * THIS PSEUDO-CODE NEEDS UPDATING
@@ -600,6 +915,8 @@ void runCourse(int courseNumber) {
          * 
          * 4. Rotate left 90 degrees (until heading is 270 degrees)
          * 
+         * 4.5. reverse so that wheel axis is over CdS cell
+         * 
          * 5. Read light
          * 
          * 6. Respond to light value (display it too)
@@ -608,27 +925,24 @@ void runCourse(int courseNumber) {
          * if (color == red (on right path)) {
          *      Rotate 35 degrees right (heading == 235 degrees)
          *      Move forward 2.75 inches
-         *      Rotate 35 degrees right (heading == 270 degrees)
-         *      Move forward until button is pressed (4.5 inches?)
+         *      Rotate 35 degrees left (heading == 270 degrees)
+         *      Move forward until button is pressed (1 second)
          *      Reverse that much distance
-         *      Rotate 155 left (heading == 65 degrees)
-         *      Move forward 2.75 inches
-         *      Rotate 65 right (heading == 0 degrees)
+         *      Rotate 35 right 
+         *      Reverse 2.75 inches
+         *      Rotate 35 left 
          * 
          * } else if (color == blue (on left path)) {
          *      Rotate 35 degrees left (heading == 305 degrees)
          *      Move forward 2.75 inches
          *      Rotate 35 degrees right (heading == 270 degrees)
-         *      Move forward until button is pressed (4.5 inches?)
+         *      Move forward until button is pressed (1 second)
          *      Reverse that much distance
-         *      Rotate 155 right (heading == 115 degrees)
-         *      Move forward 2.75 inches
-         *      Rotate 115 degrees right (heading == 0 degrees)
+         *      Rotate 35 left 
+         *      Reverse 2.75 inches
+         *      Rotate 35 degrees right
          * 
-         * } else {
-         *      Resort to RPS to try and find light 
-         *      (take a certain amount of time to do this or move on)
-         * }
+         * 6.5. Turn left 85 degrees
          * 
          * 7. Move forward 9 inches to align with ramp
          * 
@@ -640,23 +954,17 @@ void runCourse(int courseNumber) {
          * 
          * 11. Move forward 14 inches (from ramp)
          * 
-         * 12. Rotate 180 degrees right (heading == 270 degrees)
+         * 12. Reverse that much (35 inches)
          * 
-         * 13. Move forward 14 inches (from ramp)
+         * 13. Rotate 90 degrees right (heading == 0 degrees)
          * 
-         * 14. Move forward (10 inches) (across ramp)
+         * 14. Move forward 2.9 inches 
          * 
-         * 15. Move forward (11 inches) (base of ramp)
+         * 15. Rotate 45 degrees right (heading == 315 degrees)
          * 
-         * 16. Rotate 90 degrees left (heading == 0 degrees)
+         * 16. Move forward until button is pressed (7.5 inches?)
          * 
-         * 17. Move forward 2.9 inches 
-         * 
-         * 18. Rotate 45 degrees right (heading == 315 degrees)
-         * 
-         * 19. Move forward until button is pressed (7.5 inches?)
-         * 
-         * 20. Win.
+         * 17. Win.
          * 
          */ 
 
@@ -685,11 +993,9 @@ void runCourse(int courseNumber) {
         //Reverses to move CdS cell over jukebox light
         move_forward_inches(-20, 0.75 + DIST_AXIS_CDS);
     
-
        /***************************************************/
 
         writeStatus("Pressing jukebox buttons");
-        
         
         // Presses jukebox buttons
         pressJukeboxButtons();
@@ -738,27 +1044,27 @@ void runCourse(int courseNumber) {
         break;
         
 
-    case 2: // Performance Test 2
+    case PERF_COURSE_2: // Performance Test 2
         LCD.Clear();
         LCD.Write("Running Performance Test 2");
         break;
 
-    case 3: // Performance Test 3
+    case PERF_COURSE_3: // Performance Test 3
         LCD.Clear();
         LCD.Write("Running Performance Test 3");
         break;
 
-    case 4: // Performance Test 4
+    case PERF_COURSE_4: // Performance Test 4
         LCD.Clear();
         LCD.Write("Running Performance Test 4");
         break;
 
-    case 5: // Individual Competition
+    case IND_COMP: // Individual Competition
         LCD.Clear();
         LCD.Write("Running Ind. Competition");
         break;
 
-    case 6: // Final Competition
+    case FINAL_COMP: // Final Competition
         LCD.Clear();
         LCD.Write("Running Final Competition");
         break;
@@ -777,19 +1083,18 @@ int main() {
 
     float xTrash, yTrash;
 
-    // Initializes screen
-    startUp();
-    Sleep(1.0);
-
     // Initializes RPS
-    RPS.InitializeTouchMenu();
+    //RPS.InitializeTouchMenu();
+
+    // Initializes menu
+    int courseNumber = startMenu();
 
     //Waits until start light is read
-    readStartLight();
-    Sleep(1.0);
+    //readStartLight();
+    //Sleep(1.0);
 
     // Runs specified course number.
-    runCourse(1);
+    runCourse(courseNumber);
 
     return 0;
 }

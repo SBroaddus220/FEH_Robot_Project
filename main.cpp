@@ -9,17 +9,29 @@
 /*       Uses Doxygen for documentation      */
 /*********************************************/
 
+/*
+ * To do:
+ *
+ * 1. Add test courses/touch calibrate to runCourse 
+ * 
+ * 2. Add RPS check to movement
+ * 
+ * 3. 
+ * 
+ */ 
+
 // Include preprocessor directives
 #include <FEHLCD.h>
 #include <FEHIO.h>
 #include <FEHUtility.h>
 #include <FEHMotor.h>
 #include <FEHRPS.h>
+#include <FEHServo.h>
 #include <cmath> // abs() 
 
 // Definitions
-#define ROBOT_WIDTH 7.95 // Length of front/back side of OUR robot in inches
-//#define ROBOT_WIDTH 7.0 // CRAYOLA BOT
+//#define ROBOT_WIDTH 7.95 // Length of front/back side of OUR robot in inches
+#define ROBOT_WIDTH 7.0 // CRAYOLA BOT
 #define PI 3.14159265
 #define BACKGROUND_COLOR WHITE // Background color of layout
 #define FONT_COLOR BLACK // Font color of layout
@@ -35,8 +47,8 @@
  * 
  * (DIST_CDS_CELL_BACK_EDGE - DIST_WHEEL_AXLE_BACK_EDGE)
  */ 
-#define DIST_AXIS_CDS (5.375 - 1.25) // OUR BOT
-//#define DIST_AXIS_CDS (4.25 - 1.75) // CRAYOLA BOT
+//#define DIST_AXIS_CDS (5.375 - 1.25) // OUR BOT
+#define DIST_AXIS_CDS (4.25 - 1.75) // CRAYOLA BOT
 
 /*
  * One of our motors is inversed, so it'll be different than test code with the Crayola bot. 
@@ -47,7 +59,7 @@
  * true -> Our robot
  * false -> Crayola bot
  */ 
-#define INVERSED_WHEEL true
+#define INVERSED_WHEEL false
 
 /*
  * Number of encoder counts per inch.
@@ -55,6 +67,18 @@
  * ((ENCODER_COUNTS_PER_REV / (2 * PI * WHEEL_RADIUS))) 
  */ 
 #define COUNT_PER_INCH (318 / (2 * 3.14159265 * 1.25)) // Number of encoder counts per inch
+
+/*
+ * Servo min/max values
+ *
+ * base_servo -> Futaba S3003 servo on base (lower arm portion)
+ * on_arm_servo -> TBD (upper arm portion)
+ */ 
+#define BASE_SERVO_MIN 500
+#define BASE_SERVO_MAX 2290
+#define ON_ARM_SERVO_MIN null
+#define ON_ARM_SERVO_MAX null
+
 
 // Course numbers. Used in startMenu() and runCourse()
 enum { 
@@ -87,8 +111,14 @@ void runCourse(); // Runs the course specified by startUp()
 // Declarations for encoders/motors
 DigitalEncoder right_encoder(FEHIO::P0_0);
 DigitalEncoder left_encoder(FEHIO::P0_1);
-FEHMotor right_motor(FEHMotor::Motor2,9.0);
-FEHMotor left_motor(FEHMotor::Motor3,9.0);
+//FEHMotor right_motor(FEHMotor::Motor2,9.0);
+//FEHMotor left_motor(FEHMotor::Motor3,9.0);
+FEHMotor right_motor(FEHMotor::Motor2,9.0); // CRAYOLA BOT
+FEHMotor left_motor(FEHMotor::Motor1,9.0); // CRAYOLA BOT
+
+// Declarations for servos
+FEHServo base_servo(FEHServo::Servo7);
+//FEHServo on_arm_servo(FEHServo::Servo5);
 
 // Declaration for CdS cell sensorsad 
 AnalogInputPin CdS_cell(FEHIO::P1_0);
@@ -636,6 +666,31 @@ void turn_left_degrees(int percent, float degrees) {
 }
 
 /*******************************************************
+ * @brief Initiates both servos, sets min/max values and 
+ * turns it to starting rotation.
+ */
+void initiateServos() {
+    
+    // Calibrates base servo
+    base_servo.SetMin(BASE_SERVO_MIN);
+    base_servo.SetMax(BASE_SERVO_MAX);
+
+    // Sets base servo to initial degree
+    base_servo.SetDegree(90.);
+}
+
+/*******************************************************
+ * @brief Checks if the Proteus turned a certain degrees based on RPS data, adjusts accordingly for timeToCheck seconds.
+ * 
+ * @param percent Motor percent power to turn at to align.
+ * @param degrees Degrees to check.
+ * @param timeToCheck Time for the robot to check if it is aligned.
+ *
+void checkTurnRPS(int percent, float degrees, float timeToCheck) {
+
+}*/
+
+/*******************************************************
  * @brief Detects the color using the CdS cell
  * 
  * @return int color Color detected.
@@ -884,19 +939,32 @@ void runCourse(int courseNumber) {
     switch (courseNumber)
     {
     case TEST_COURSE_1: // Test course 1
-        LCD.Write("Running Test Course 1");
+        writeStatus("Running Test 1");
+        Sleep(1.0);
+        turn_left_degrees(20, 90);
+        writeStatus("Complete.");
         break;
 
     case TEST_COURSE_2: // Test course 1
-        LCD.Write("Running Test Course 2");
+        writeStatus("Running Test 2");
+        Sleep(1.0);
+        while(true) {
+            move_forward_inches(20, 2);
+        }
         break;
 
     case TEST_COURSE_3: // Test course 1
-        LCD.Write("Running Test Course 3");
+        writeStatus("Running Test 3");
+        Sleep(1.0);
+        base_servo.SetDegree(180.);
+        Sleep(1.0);
+        base_servo.SetDegree(0.);
         break;
 
     case CALIBRATE_SERVOS:
         LCD.Write("Calibrating Servos");
+        Sleep(1.0);
+        base_servo.TouchCalibrate();
         break;
 
     case PERF_COURSE_1: // Performance Test 1
@@ -1076,10 +1144,13 @@ int main() {
 
     float xTrash, yTrash;
 
+    // Initiates servos
+    initiateServos();
+
     // Initializes RPS
     //RPS.InitializeTouchMenu();
 
-    // Initializes menu
+    // Initializes menu and returns chosen course number
     int courseNumber = startMenu();
 
     //Waits until start light is read

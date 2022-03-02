@@ -33,6 +33,7 @@
  * 
  */
 
+/************************************************/
 // Include preprocessor directives
 #include <FEHLCD.h>
 #include <FEHIO.h>
@@ -42,58 +43,29 @@
 #include <FEHServo.h>
 #include <cmath> // abs() 
 
+/************************************************/
 // Definitions
 #define ROBOT_WIDTH 7.95 // Length of front/back side of OUR robot in inches
-//#define ROBOT_WIDTH 7.0 // CRAYOLA BOT
 #define PI 3.14159265
 #define BACKGROUND_COLOR WHITE // Background color of layout
 #define FONT_COLOR BLACK // Font color of layout
+#define BUTTON_TIME_TO_SLEEP 0.20 // Time to sleep (seconds) after button pressed for accessibility.
+
+// Movement/Dimension calculations
+#define DIST_AXIS_CDS (5.375 - 1.25) // Distance from the center of the wheel axis to the CdS cell.
+#define COUNT_PER_INCH (318 / (2 * 3.14159265 * 1.25)) // Number of encoder counts per inch ((ENCODER_COUNTS_PER_REV / (2 * PI * WHEEL_RADIUS))) 
+
+// Precise movement calibrations
 #define BACKWARDS_CALIBRATOR 2.15 // Percent difference needed to make backward motors move the same as forward motors at 20% 
-#define TURN_CALIBRATOR 1 // Percent more to turn to adjust 
-#define RIGHT_MOTOR_CALIBRATOR 1
+#define RIGHT_MOTOR_CALIBRATOR 1 
 
-// Time to sleep (seconds) after button pressed for accessibility
-#define BUTTON_TIME_TO_SLEEP 0.20
-
-/*
- * Distance from the center of the wheel axis to the CdS cell.
- * Used to map out course.
- * 
- * (DIST_CDS_CELL_BACK_EDGE - DIST_WHEEL_AXLE_BACK_EDGE)
- */ 
-#define DIST_AXIS_CDS (5.375 - 1.25) // OUR BOT
-//#define DIST_AXIS_CDS (4.25 - 1.75) // CRAYOLA BOT
-
-/*
- * One of our motors is inversed, so it'll be different than test code with the Crayola bot. 
- *
- * This shows if we are testing our robot or the crayola bot so only one place needs to be changed.
- * Affects all moving functions.
- * 
- * true -> Our robot
- * false -> Crayola bot
- */ 
-#define INVERSED_WHEEL true
-
-/*
- * Number of encoder counts per inch.
- *
- * ((ENCODER_COUNTS_PER_REV / (2 * PI * WHEEL_RADIUS))) 
- */ 
-#define COUNT_PER_INCH (318 / (2 * 3.14159265 * 1.25)) // Number of encoder counts per inch
-
-/*
- * Servo min/max values
- *
- * base_servo -> Futaba S3003 servo on base (lower arm portion)
- * on_arm_servo -> TBD (upper arm portion)
- */ 
+// Servo min/max values
 #define BASE_SERVO_MIN 500
 #define BASE_SERVO_MAX 2290
 #define ON_ARM_SERVO_MIN 500
 #define ON_ARM_SERVO_MAX 2400
 
-
+/************************************************/
 // Course numbers. Used in startMenu() and runCourse()
 enum { 
             TEST_COURSE_1 = 1, 
@@ -108,8 +80,9 @@ enum {
             FINAL_COMP = 10
          };
 
+/************************************************/
 // Function Prototypes
-int confirmation(char prompt[], int xPrompt, int yPrompt); // Prompts the user to confirm a choice
+int confirmation(const char prompt[], int xPrompt, int yPrompt); // Prompts the user to confirm a choice
 void drawMainMenuScreen(FEHIcon::Icon test_button, FEHIcon::Icon perf_test_button, FEHIcon::Icon competition_button); // Draws the main menu screen
 int startMenu(); // Sets up a starting menu for the user.
 int readStartLight(); // Waits for the start light
@@ -118,17 +91,16 @@ void turn_right_degrees(int percent, float degrees); // Turns right a specified 
 void turn_left_degrees(int percent, float degrees); // Turns left a specified amount of degrees
 int detectColor(int timeToDetect); // Detects the color of the jukebox
 void pressJukeboxButtons(); // Presses the jukebox buttons
-void writeStatus(char status[]); // Clears room for a printed string w/o clearing display
+void writeStatus(const char status[]); // Clears room for a printed string w/o clearing display
 void showRPSData(); // Shows basic RPS data for the robot
-void runCourse(); // Runs the course specified by startUp()
+void runCourse(int courseNumber); // Runs the course specified by startUp()
 
+/************************************************/
 // Declarations for encoders/motors
 DigitalEncoder right_encoder(FEHIO::P3_2);
 DigitalEncoder left_encoder(FEHIO::P3_1);
 FEHMotor right_motor(FEHMotor::Motor2,9.0);
 FEHMotor left_motor(FEHMotor::Motor3,9.0);
-//FEHMotor right_motor(FEHMotor::Motor2,9.0); // CRAYOLA BOT
-//FEHMotor left_motor(FEHMotor::Motor1,9.0); // CRAYOLA BOT
 
 // Declarations for servos
 // GROUND FARTHER SIDE
@@ -520,7 +492,8 @@ int readStartLight() {
         LCD.WriteRC("CdS Value: ", 7, 2);
         LCD.WriteRC(CdS_cell.Value(), 7, 20);
 
-        if (std::abs(CdS_cell.Value() - 0.25) < 0.2) {
+        // If 
+        if (CdS_cell.Value() < 0.345) {
             lightOn = 1;
             writeStatus("GO!");
         }
@@ -535,8 +508,7 @@ int readStartLight() {
  * @param percent - Percent for the motors to run at. Negative for reverse.
  * @param inches - Inches to move forward .
  */
-void move_forward_inches(int percent, float inches)
-{
+void move_forward_inches(int percent, float inches) {
     // Calculates desired counts based on the radius of the wheels and the robot
     float expectedCounts = COUNT_PER_INCH * inches;
 
@@ -583,8 +555,6 @@ void move_forward_inches(int percent, float inches)
  */
 void turn_right_degrees(int percent, float degrees) {
 
-    //degrees += 1.0;
-
     // Calculates desired counts based on the radius of the wheels and the robot
     float expectedCounts = COUNT_PER_INCH * ((degrees * PI) / 180.0) * (ROBOT_WIDTH / 2);
 
@@ -630,8 +600,6 @@ void turn_right_degrees(int percent, float degrees) {
  * @param degrees - Degrees to rotate.
  */
 void turn_left_degrees(int percent, float degrees) {
-
-    //degrees += 1.0;
 
     // Calculates desired counts based on the radius of the wheels and the robot
     float expectedCounts = COUNT_PER_INCH * ((degrees * PI) / 180.0) * (ROBOT_WIDTH / 2);
@@ -686,20 +654,9 @@ void initiateServos() {
     on_arm_servo.SetMax(ON_ARM_SERVO_MAX);
 
     // Sets base servo to initial degree
-    base_servo.SetDegree(0.);
+    base_servo.SetDegree(85.);
     on_arm_servo.SetDegree(180.);
 }
-
-/*******************************************************
- * @brief Checks if the Proteus turned a certain degrees based on RPS data, adjusts accordingly for timeToCheck seconds.
- * 
- * @param percent Motor percent power to turn at to align.
- * @param degrees Degrees to check.
- * @param timeToCheck Time for the robot to check if it is aligned.
- *
-void checkTurnRPS(int percent, float degrees, float timeToCheck) {
-
-}*/
 
 /*******************************************************
  * @brief Detects the color using the CdS cell
@@ -804,22 +761,16 @@ void pressJukeboxButtons() {
         move_forward_inches(20, 2.75);
         turn_left_degrees(20, 35);
 
-
         float startTime = TimeNow();
 
         while (TimeNow() - startTime < 1.0) {
             // Sets both motors to same percentage
-            if (INVERSED_WHEEL) {
-                right_motor.SetPercent(-20 - RIGHT_MOTOR_CALIBRATOR);
-            } else {
-                right_motor.SetPercent(20 + RIGHT_MOTOR_CALIBRATOR);
-            }
+            right_motor.SetPercent(20);
             left_motor.SetPercent(20);
         }
 
         right_motor.Stop();
         left_motor.Stop();
-
 
         Sleep(2.0);
 
@@ -828,11 +779,7 @@ void pressJukeboxButtons() {
 
         while (TimeNow() - startTime < 1.0) {
             // Sets both motors to same percentage
-            if (INVERSED_WHEEL) {
-                right_motor.SetPercent(20 - RIGHT_MOTOR_CALIBRATOR);
-            } else {
-                right_motor.SetPercent(-20 + RIGHT_MOTOR_CALIBRATOR);
-            }
+            right_motor.SetPercent(-20);
             left_motor.SetPercent(-20);
         }
 
@@ -851,11 +798,7 @@ void pressJukeboxButtons() {
 
         while (TimeNow() - startTime < 1.0) {
             // Sets both motors to same percentage
-            if (INVERSED_WHEEL) {
-                right_motor.SetPercent(-20 - RIGHT_MOTOR_CALIBRATOR);
-            } else {
-                right_motor.SetPercent(20 + RIGHT_MOTOR_CALIBRATOR);
-            }
+            right_motor.SetPercent(20);
             left_motor.SetPercent(20);
         }
 
@@ -869,11 +812,7 @@ void pressJukeboxButtons() {
 
         while (TimeNow() - startTime < 1.0) {
             // Sets both motors to same percentage
-            if (INVERSED_WHEEL) {
-                right_motor.SetPercent(20 - RIGHT_MOTOR_CALIBRATOR);
-            } else {
-                right_motor.SetPercent(-20 + RIGHT_MOTOR_CALIBRATOR);
-            }
+            right_motor.SetPercent(-20);
             left_motor.SetPercent(-20);
         }
 
@@ -958,9 +897,9 @@ void runCourse(int courseNumber) {
         while(true) {
             writeStatus("Press to turn left.");
             while(!LCD.Touch(&xGarb, &yGarb));
-            turn_left_degrees(20, 90);
+            turn_left_degrees(40, 90);
             while(!LCD.Touch(&xGarb, &yGarb));
-            turn_right_degrees(20, 90);
+            turn_right_degrees(40, 90);
         }
         writeStatus("Complete.");
         break;
@@ -977,31 +916,65 @@ void runCourse(int courseNumber) {
         while(true) {
             move_forward_inches(20, 9999);
         }
+
         break;
 
     case TEST_COURSE_3: // Test course 1
         writeStatus("Running Test 3");
 
-        float degreesToTurn;
+        float degreesToTurnBase, degreesToTurnArm;
         int xTrash, yTrash;
-        degreesToTurn = 90.0;
-        on_arm_servo.SetDegree(degreesToTurn);
+        degreesToTurnBase = 90.0;
+        degreesToTurnArm = 90.0;
 
+        base_servo.SetDegree(degreesToTurnBase);
+        on_arm_servo.SetDegree(degreesToTurnArm);
+
+        LCD.DrawHorizontalLine(40, 0, 319);
+        LCD.DrawHorizontalLine(140, 0, 319);
+        LCD.DrawVerticalLine(160, 0, 239);
+        
         while (true) {
+
             while(!LCD.Touch(&xTrash, &yTrash));
-                LCD.Clear();
-                if (xTrash > 160) {
-                    if ((degreesToTurn - 1.0) >= 0) {
-                        degreesToTurn -= 1.0;
-                        on_arm_servo.SetDegree(degreesToTurn);
+
+                LCD.SetFontColor(BACKGROUND_COLOR);
+                LCD.FillRectangle(0, 0, 159, 39);
+                LCD.SetFontColor(FONT_COLOR);
+
+                // Base Servo
+                if (xTrash < 160) {
+                    if (yTrash < 120) {
+                        if ((degreesToTurnBase + 2.5) >= 0) {
+                            degreesToTurnBase += 2.5;
+                            base_servo.SetDegree(degreesToTurnBase);
+                        }
+                    } else {
+                        if ((degreesToTurnBase - 2.5) <= 180) {
+                            degreesToTurnBase - 2.5;
+                            base_servo.SetDegree(degreesToTurnBase);
+                        }
                     }
-                } else {
-                    if ((degreesToTurn + 1.0) <= 180) {
-                        degreesToTurn += 1.0;
-                        on_arm_servo.SetDegree(degreesToTurn);
+                    
+                    LCD.WriteRC("Base:", 1, 0);
+                    LCD.WriteRC(degreesToTurnBase, 1, 6);
+
+                } else { // Arm servo
+                    if (yTrash < 120) {
+                        if ((degreesToTurnArm + 2.5) >= 0) {
+                            degreesToTurnArm += 2.5;
+                            on_arm_servo.SetDegree(degreesToTurnArm);
+                        }
+                    } else {
+                        if ((degreesToTurnArm - 2.5) <= 180) {
+                            degreesToTurnArm - 2.5;
+                            on_arm_servo.SetDegree(degreesToTurnArm);
+                        }
                     }
-                }
-                LCD.WriteRC(degreesToTurn, 1, 2);
+
+                    LCD.WriteRC("Arm:", 1, 14);
+                    LCD.WriteRC(degreesToTurnArm, 1, 19);
+                }    
         }
 
         break;
@@ -1016,7 +989,7 @@ void runCourse(int courseNumber) {
         // Waits for touch. If touch is on left then base_servo is calibrated, and vice versa
         while(!LCD.Touch(&xTrash420, &yTrash69));
 
-        LCD.DrawVerticalLine(160, 0, 239);
+        LCD.DrawVerticalLine(160, 20, 239);
 
         if (xTrash420 < 160) {
             base_servo.TouchCalibrate();
@@ -1232,10 +1205,11 @@ void runCourse(int courseNumber) {
     
         writeStatus("Dropping tray");
 
-        base_servo.SetDegree(90.);
+        base_servo.SetDegree(85.);
         Sleep(1.0);
         base_servo.SetDegree(105.);
-        Sleep(1.0);
+        Sleep(2.5);
+        base_servo.SetDegree(85.);
 
         writeStatus("Moving away from sink");
         move_forward_inches(20, 7);

@@ -54,6 +54,8 @@
 // Movement/Dimension calculations
 #define DIST_AXIS_CDS (5.375 - 1.25) // Distance from the center of the wheel axis to the CdS cell.
 #define COUNT_PER_INCH (318 / (2 * 3.14159265 * 1.25)) // Number of encoder counts per inch ((ENCODER_COUNTS_PER_REV / (2 * PI * WHEEL_RADIUS))) 
+#define INCH_PER_COUNT ((2 * 3.14159265 * 1.25) / 318) // ^ but opposite
+
 
 // Precise movement calibrations
 #define BACKWARDS_CALIBRATOR 2.15 // Percent difference needed to make backward motors move the same as forward motors at 20% 
@@ -64,6 +66,32 @@
 #define BASE_SERVO_MAX 2290
 #define ON_ARM_SERVO_MIN 500
 #define ON_ARM_SERVO_MAX 2400
+
+// Global variables for PID (Will make class later)
+
+// PID Right Motor
+double PID_Linear_SpeedR, PID_New_CountsR, PID_Last_CountsR, PID_New_TimeR, PID_Last_TimeR, PID_New_Speed_ErrorR, PID_Last_Speed_ErrorR, PID_Error_SumR;
+float PID_NEW_MOTOR_POWERR, PID_OLD_MOTOR_POWERR;
+double PTermR, ITermR, DTermR;
+
+double PConstR = 0.75;
+double IConstR = 0.05; 
+double DConstR = 0.25;
+
+// PID Left Motor
+double PID_Linear_SpeedL, PID_New_CountsL, PID_Last_CountsL, PID_New_TimeL, PID_Last_TimeL, PID_New_Speed_ErrorL, PID_Last_Speed_ErrorL, PID_Error_SumL;
+float PID_NEW_MOTOR_POWERL, PID_OLD_MOTOR_POWERL;
+double PTermL, ITermL, DTermL;
+
+double PConstL = 0.75; // 0.75
+double IConstL = 0.05; 
+double DConstL = 0.25;
+
+// Both
+double PID_TIME;
+double PID_DISTANCE_PER_COUNT = ((2 * 3.14159265 * 1.25) / 318);
+
+#define SLEEP_PID 0.15
 
 /************************************************/
 // Course numbers. Used in startMenu() and runCourse()
@@ -639,6 +667,215 @@ void turn_left_degrees(int percent, float degrees) {
     LCD.WriteRC(right_encoder.Counts(), 12, 20);
 }
 
+/*******************************************************************/
+// PID STUFF
+
+void ResetPIDVariables() {
+    
+    // Resets all variables to inital state
+    PID_Linear_SpeedR = 0;
+    PID_New_CountsR = 0;
+    PID_Last_CountsR = 0;
+    PID_New_TimeR = 0;
+    PID_Last_TimeR = 0;
+    PID_New_Speed_ErrorR = 0;
+    PID_Last_Speed_ErrorR = 0;
+    PID_OLD_MOTOR_POWERR = 0;
+    PID_NEW_MOTOR_POWERR = 0;
+    PID_Linear_SpeedR = 0;
+    PTermR = 0;
+    ITermR = 0;
+    DTermR = 0;
+
+    PID_Linear_SpeedL = 0;
+    PID_New_CountsL = 0;
+    PID_Last_CountsL = 0;
+    PID_New_TimeL = 0;
+    PID_Last_TimeL = 0;
+    PID_New_Speed_ErrorL = 0;
+    PID_Last_Speed_ErrorL = 0;
+    PID_OLD_MOTOR_POWERL = 0;
+    PID_NEW_MOTOR_POWERL = 0;
+    PID_Linear_SpeedL = 0;
+    PTermL = 0;
+    ITermL = 0;
+    DTermL = 0;
+    
+    // Records initial time
+    PID_TIME = TimeNow();
+
+    // Resets encoders
+    left_encoder.ResetCounts();
+    right_encoder.ResetCounts();
+
+    Sleep(0.15);
+}
+
+float RightPIDAdjustment(double expectedSpeed) {
+
+    // Finds change in counts since last time
+    PID_Last_CountsR = PID_New_CountsR;
+    PID_New_CountsR = right_encoder.Counts();
+    
+    // Finds change in time since last time
+    PID_Last_TimeR = PID_New_TimeR;
+    PID_New_TimeR = TimeNow();
+
+    // Finds actual velocity
+    PID_Linear_SpeedR = (PID_DISTANCE_PER_COUNT * ((PID_New_CountsR - PID_Last_CountsR) / (PID_New_TimeR - PID_Last_TimeR)));
+
+    // Finds error
+    PID_New_Speed_ErrorR = expectedSpeed - PID_Linear_SpeedR;
+
+    // Adds error to error sum
+    PID_Error_SumR += PID_New_Speed_ErrorR;
+
+    // Calculates PTerm
+    PTermR = PID_New_Speed_ErrorR * PConstR;
+
+    // Calculates ITerm
+    ITermR = PID_Error_SumR * IConstR;
+
+    // Calculates DTerm
+    DTermR = (PID_New_Speed_ErrorR - PID_Last_Speed_ErrorR) * DConstR;
+
+    // Saves past error
+    PID_Last_Speed_ErrorR = PID_New_Speed_ErrorR;
+
+    return (PID_OLD_MOTOR_POWERR + PTermR + ITermR + DTermR);
+}
+
+float LeftPIDAdjustment(double expectedSpeed) {
+    
+    // Finds change in counts since last time
+    PID_Last_CountsL = PID_New_CountsL;
+    PID_New_CountsL = left_encoder.Counts();
+    
+    // Finds change in time since last time
+    PID_Last_TimeL = PID_New_TimeL;
+    PID_New_TimeL = TimeNow();
+
+    // Finds actual velocity
+    PID_Linear_SpeedL = (PID_DISTANCE_PER_COUNT * ((PID_New_CountsL - PID_Last_CountsL) / (PID_New_TimeL - PID_Last_TimeL)));
+
+    // Finds error
+    PID_New_Speed_ErrorL = expectedSpeed - PID_Linear_SpeedL;
+
+    // Adds error to error sum
+    PID_Error_SumL += PID_New_Speed_ErrorL;
+
+    // Calculates PTerm
+    PTermL = PID_New_Speed_ErrorL * PConstL;
+
+    // Calculates ITerm
+    ITermL = PID_Error_SumL * IConstL;
+
+    // Calculates DTerm
+    DTermL = (PID_New_Speed_ErrorL - PID_Last_Speed_ErrorL) * DConstL;
+
+    // Saves past error
+    PID_Last_Speed_ErrorL = PID_New_Speed_ErrorL;
+
+    return (PID_OLD_MOTOR_POWERL + PTermL + ITermL + DTermL);
+}
+
+void move_forward_PID(float in_per_sec, float inches) {
+
+    ResetPIDVariables();
+
+    while ((((left_encoder.Counts() + right_encoder.Counts()) / 2) * PID_DISTANCE_PER_COUNT) < inches) {
+        
+        PID_NEW_MOTOR_POWERR = RightPIDAdjustment(in_per_sec);
+        PID_NEW_MOTOR_POWERL = LeftPIDAdjustment(in_per_sec);
+        
+        right_motor.SetPercent(PID_NEW_MOTOR_POWERR);
+        left_motor.SetPercent(PID_NEW_MOTOR_POWERL);
+
+        PID_OLD_MOTOR_POWERR = PID_NEW_MOTOR_POWERR;
+        PID_OLD_MOTOR_POWERL = PID_NEW_MOTOR_POWERL;
+
+        Sleep(SLEEP_PID);
+    }
+
+    right_motor.Stop();
+    left_motor.Stop();
+    
+}
+
+void turn_left_PID(float in_per_sec, float degrees) {
+
+    double inches = ((degrees * PI) / 180.0) * (7.5 / 2);
+
+    ResetPIDVariables();
+
+    while ((((left_encoder.Counts() + right_encoder.Counts()) / 2) * PID_DISTANCE_PER_COUNT) < inches) {
+        
+        PID_NEW_MOTOR_POWERR = RightPIDAdjustment(in_per_sec);
+        PID_NEW_MOTOR_POWERL = LeftPIDAdjustment(in_per_sec);
+        
+        right_motor.SetPercent(PID_NEW_MOTOR_POWERR);
+        left_motor.SetPercent(-PID_NEW_MOTOR_POWERL);
+
+        PID_OLD_MOTOR_POWERR = PID_NEW_MOTOR_POWERR;
+        PID_OLD_MOTOR_POWERL = PID_NEW_MOTOR_POWERL;
+
+        Sleep(SLEEP_PID);
+    }
+
+    right_motor.Stop();
+    left_motor.Stop();
+    
+}
+
+void turn_right_PID(float in_per_sec, float degrees) {
+
+    double inches = ((degrees * PI) / 180.0) * (7.5 / 2);
+
+    ResetPIDVariables();
+
+    while ((((left_encoder.Counts() + right_encoder.Counts()) / 2) * PID_DISTANCE_PER_COUNT) < inches) {
+        
+        PID_NEW_MOTOR_POWERR = RightPIDAdjustment(in_per_sec);
+        PID_NEW_MOTOR_POWERL = LeftPIDAdjustment(in_per_sec);
+        
+        right_motor.SetPercent(-PID_NEW_MOTOR_POWERR);
+        left_motor.SetPercent(PID_NEW_MOTOR_POWERL);
+
+        PID_OLD_MOTOR_POWERR = PID_NEW_MOTOR_POWERR;
+        PID_OLD_MOTOR_POWERL = PID_NEW_MOTOR_POWERL;
+
+        Sleep(SLEEP_PID);
+    }
+
+    right_motor.Stop();
+    left_motor.Stop();
+    
+}
+
+void reverse_PID(float in_per_sec, float inches) {
+
+    ResetPIDVariables();
+
+    while ((((left_encoder.Counts() + right_encoder.Counts()) / 2) * PID_DISTANCE_PER_COUNT) < inches) {
+        
+        PID_NEW_MOTOR_POWERR = RightPIDAdjustment(in_per_sec);
+        PID_NEW_MOTOR_POWERL = LeftPIDAdjustment(in_per_sec);
+        
+        right_motor.SetPercent(-PID_NEW_MOTOR_POWERR);
+        left_motor.SetPercent(-PID_NEW_MOTOR_POWERL);
+
+        PID_OLD_MOTOR_POWERR = PID_NEW_MOTOR_POWERR;
+        PID_OLD_MOTOR_POWERL = PID_NEW_MOTOR_POWERL;
+
+        Sleep(SLEEP_PID);
+    }
+
+    right_motor.Stop();
+    left_motor.Stop();
+    
+}
+
+
 /*******************************************************
  * @brief Initiates both servos, sets min/max values and 
  * turns it to starting rotation.
@@ -1189,7 +1426,6 @@ void runCourse(int courseNumber) {
 
         Sleep(1.0);
 
-    
         writeStatus("Aligning with ramp");
         move_forward_inches(20, 11.55 + DIST_AXIS_CDS);
         turn_right_degrees(20, 45);
@@ -1201,7 +1437,7 @@ void runCourse(int courseNumber) {
         turn_right_degrees(20, 90);
         move_forward_inches(-20, 10.5); // Reverses
         turn_left_degrees(20, 90);
-        move_forward_inches(-20, 7);
+        move_forward_inches(-20, 8);
     
         writeStatus("Dropping tray");
 
@@ -1212,21 +1448,35 @@ void runCourse(int courseNumber) {
         base_servo.SetDegree(85.);
 
         writeStatus("Moving away from sink");
-        move_forward_inches(20, 7);
-        turn_left_degrees(20, 90);
-        move_forward_inches(-20, 10.5);
+        move_forward_inches(20, 8);
+        turn_right_degrees(20, 90);
+        move_forward_inches(20, 10.5);
+        turn_left_degrees(20, 185);
 
         writeStatus("Moving towards ticket");
-        move_forward_inches(-20, 12.15);
+        move_forward_inches(-20, 13.15);
         turn_left_degrees(20, 90);
-        move_forward_inches(20, 8.1);
 
         writeStatus("Sliding ticket");
+        on_arm_servo.SetDegree(45);
+        Sleep(1.0);
+        base_servo.SetDegree(0);
+
+        move_forward_inches(20, 5.7);
+
+        on_arm_servo.SetDegree(180);
+
+        Sleep(1.0);
+
+        move_forward_inches(-20, 23);
+
     
         break;
 
     case PERF_COURSE_3: // Performance Test 3
         LCD.Write("Running Performance Test 3");
+
+
         break;
 
     case PERF_COURSE_4: // Performance Test 4
@@ -1264,8 +1514,8 @@ int main() {
     int courseNumber = startMenu();
 
     //Waits until start light is read
-    //readStartLight();
-    //Sleep(1.0);
+    readStartLight();
+    Sleep(1.0);
 
     // Runs specified course number.
     runCourse(courseNumber);

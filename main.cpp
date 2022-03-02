@@ -5,20 +5,33 @@
 /*      Steven Broaddus, Conolly Burgess     */
 /*        Joseph Richmond, Jake Chang        */
 /*                                           */
-/*            Updated 2/27/2022              */
+/*            Updated 3/2/2022               */
 /*       Uses Doxygen for documentation      */
 /*********************************************/
 
 /*
- * To do:
+ * Game plan for tonight: 
  *
- * 1. Add test courses/touch calibrate to runCourse 
+ * 1. Commit current code to GitHub for backup
  * 
- * 2. Add RPS check to movement
+ * 1.5. Clean code of any obvious issues.
  * 
- * 3. 
+ * 2. Check online documentation to see how much slower reversing motors are 
+ * than forward Igwan motors.
  * 
- */ 
+ * 3. Get robot to drive straight (calibrate right motor)
+ * 
+ * 4. See if calibrated right motor can turn degress with accuracy. 
+ * If not possible with both wheels, use only one forward wheel.
+ * 
+ * 5. Take detailed measurements of robot or check for Joe's model.
+ * 
+ * 5. Map out course with dimensions of robot accounted for. This will use the turn that 
+ * I deem most accurate.
+ * 
+ * 6. Get to a decent spot.
+ * 
+ */
 
 // Include preprocessor directives
 #include <FEHLCD.h>
@@ -30,13 +43,14 @@
 #include <cmath> // abs() 
 
 // Definitions
-//#define ROBOT_WIDTH 7.95 // Length of front/back side of OUR robot in inches
-#define ROBOT_WIDTH 7.0 // CRAYOLA BOT
+#define ROBOT_WIDTH 7.95 // Length of front/back side of OUR robot in inches
+//#define ROBOT_WIDTH 7.0 // CRAYOLA BOT
 #define PI 3.14159265
 #define BACKGROUND_COLOR WHITE // Background color of layout
 #define FONT_COLOR BLACK // Font color of layout
-#define RIGHT_MOTOR_CALIBRATOR 1 // Percent difference needed to go straight
-#define TURN_CALIBRATOR 1 // Degrees less to turn to calibrate
+#define BACKWARDS_CALIBRATOR 2.15 // Percent difference needed to make backward motors move the same as forward motors at 20% 
+#define TURN_CALIBRATOR 1 // Percent more to turn to adjust 
+#define RIGHT_MOTOR_CALIBRATOR 1
 
 // Time to sleep (seconds) after button pressed for accessibility
 #define BUTTON_TIME_TO_SLEEP 0.20
@@ -47,8 +61,8 @@
  * 
  * (DIST_CDS_CELL_BACK_EDGE - DIST_WHEEL_AXLE_BACK_EDGE)
  */ 
-//#define DIST_AXIS_CDS (5.375 - 1.25) // OUR BOT
-#define DIST_AXIS_CDS (4.25 - 1.75) // CRAYOLA BOT
+#define DIST_AXIS_CDS (5.375 - 1.25) // OUR BOT
+//#define DIST_AXIS_CDS (4.25 - 1.75) // CRAYOLA BOT
 
 /*
  * One of our motors is inversed, so it'll be different than test code with the Crayola bot. 
@@ -59,7 +73,7 @@
  * true -> Our robot
  * false -> Crayola bot
  */ 
-#define INVERSED_WHEEL false
+#define INVERSED_WHEEL true
 
 /*
  * Number of encoder counts per inch.
@@ -76,8 +90,8 @@
  */ 
 #define BASE_SERVO_MIN 500
 #define BASE_SERVO_MAX 2290
-#define ON_ARM_SERVO_MIN null
-#define ON_ARM_SERVO_MAX null
+#define ON_ARM_SERVO_MIN 500
+#define ON_ARM_SERVO_MAX 2400
 
 
 // Course numbers. Used in startMenu() and runCourse()
@@ -109,19 +123,20 @@ void showRPSData(); // Shows basic RPS data for the robot
 void runCourse(); // Runs the course specified by startUp()
 
 // Declarations for encoders/motors
-DigitalEncoder right_encoder(FEHIO::P0_0);
-DigitalEncoder left_encoder(FEHIO::P0_1);
-//FEHMotor right_motor(FEHMotor::Motor2,9.0);
-//FEHMotor left_motor(FEHMotor::Motor3,9.0);
-FEHMotor right_motor(FEHMotor::Motor2,9.0); // CRAYOLA BOT
-FEHMotor left_motor(FEHMotor::Motor1,9.0); // CRAYOLA BOT
+DigitalEncoder right_encoder(FEHIO::P3_2);
+DigitalEncoder left_encoder(FEHIO::P3_1);
+FEHMotor right_motor(FEHMotor::Motor2,9.0);
+FEHMotor left_motor(FEHMotor::Motor3,9.0);
+//FEHMotor right_motor(FEHMotor::Motor2,9.0); // CRAYOLA BOT
+//FEHMotor left_motor(FEHMotor::Motor1,9.0); // CRAYOLA BOT
 
 // Declarations for servos
-FEHServo base_servo(FEHServo::Servo7);
-//FEHServo on_arm_servo(FEHServo::Servo5);
+// GROUND FARTHER SIDE
+FEHServo base_servo(FEHServo::Servo5);
+FEHServo on_arm_servo(FEHServo::Servo7);
 
 // Declaration for CdS cell sensorsad 
-AnalogInputPin CdS_cell(FEHIO::P1_0);
+AnalogInputPin CdS_cell(FEHIO::P0_7);
 
 /*******************************************************
  * @brief Prompts the user to confirm their choice.
@@ -133,7 +148,7 @@ AnalogInputPin CdS_cell(FEHIO::P1_0);
  *          Yes -> 1 (true)
  *          No  -> 0 (false)
  */
-int confirmation(char prompt[], int xPrompt, int yPrompt) {
+int confirmation(const char prompt[], int xPrompt, int yPrompt) {
 
     enum { 
             YES = true, 
@@ -242,14 +257,15 @@ int startMenu() {
     LCD.Clear();
 
     // Creates main menu icons
+    char mainLabels[4][20] = {"Test", "Perf. Tests", "Competition", "Calibrate Servo"};
     FEHIcon::Icon test_button, perf_test_button, competition_button;
-    test_button.SetProperties("Test", 75, 75, 170, 40, FONT_COLOR, FONT_COLOR);
-    perf_test_button.SetProperties("Perf. Tests", 75, 125, 170, 40, FONT_COLOR, FONT_COLOR); 
-    competition_button.SetProperties("Competition", 75, 175, 170, 40, FONT_COLOR, FONT_COLOR); 
+    test_button.SetProperties(mainLabels[0], 75, 75, 170, 40, FONT_COLOR, FONT_COLOR);
+    perf_test_button.SetProperties(mainLabels[1], 75, 125, 170, 40, FONT_COLOR, FONT_COLOR); 
+    competition_button.SetProperties(mainLabels[2], 75, 175, 170, 40, FONT_COLOR, FONT_COLOR); 
 
     // Creates button to calibrate servos
     FEHIcon::Icon calibrate_servo_button;
-    calibrate_servo_button.SetProperties("Calibrate Servo", 50, 75, 220, 40, FONT_COLOR, FONT_COLOR);
+    calibrate_servo_button.SetProperties(mainLabels[3], 50, 75, 220, 40, FONT_COLOR, FONT_COLOR);
 
     // Assigns the labels for the different Tests
     FEHIcon::Icon testButtons[3];
@@ -509,6 +525,8 @@ int readStartLight() {
             writeStatus("GO!");
         }
     }
+
+    return lightOn;
 }
 
 /*******************************************************
@@ -535,12 +553,8 @@ void move_forward_inches(int percent, float inches)
     right_encoder.ResetCounts();
     left_encoder.ResetCounts();
 
-    // Sets both motors to same percentage
-    if (INVERSED_WHEEL) {
-        right_motor.SetPercent(-percent - RIGHT_MOTOR_CALIBRATOR);
-    } else {
-        right_motor.SetPercent(percent + RIGHT_MOTOR_CALIBRATOR);
-    }
+    // Sets both motors to same percentage, but accounts for one motor moving backwards
+    right_motor.SetPercent(percent);
     left_motor.SetPercent(percent);
 
     // Keeps running until average motor counts are in proper range
@@ -569,7 +583,7 @@ void move_forward_inches(int percent, float inches)
  */
 void turn_right_degrees(int percent, float degrees) {
 
-    percent -= TURN_CALIBRATOR;
+    //degrees += 1.0;
 
     // Calculates desired counts based on the radius of the wheels and the robot
     float expectedCounts = COUNT_PER_INCH * ((degrees * PI) / 180.0) * (ROBOT_WIDTH / 2);
@@ -588,11 +602,7 @@ void turn_right_degrees(int percent, float degrees) {
     left_encoder.ResetCounts();
 
     // Sets both motors to specific percentage
-    if (INVERSED_WHEEL) {
-        right_motor.SetPercent(percent);
-    } else {
-        right_motor.SetPercent(-percent);
-    }
+    right_motor.SetPercent(-percent - BACKWARDS_CALIBRATOR);
     left_motor.SetPercent(percent);
 
     // Keeps running until average motor counts are in proper range
@@ -621,7 +631,7 @@ void turn_right_degrees(int percent, float degrees) {
  */
 void turn_left_degrees(int percent, float degrees) {
 
-    percent -= TURN_CALIBRATOR;
+    //degrees += 1.0;
 
     // Calculates desired counts based on the radius of the wheels and the robot
     float expectedCounts = COUNT_PER_INCH * ((degrees * PI) / 180.0) * (ROBOT_WIDTH / 2);
@@ -640,12 +650,8 @@ void turn_left_degrees(int percent, float degrees) {
     left_encoder.ResetCounts();
 
     // Sets both motors to specific percentage
-    if (INVERSED_WHEEL) {
-        right_motor.SetPercent(-percent);
-    } else {
-        right_motor.SetPercent(percent);
-    }
-    left_motor.SetPercent(-percent);
+    right_motor.SetPercent(percent);
+    left_motor.SetPercent(-percent - BACKWARDS_CALIBRATOR);
 
     // Keeps running until average motor counts are in proper range
     while((left_encoder.Counts() + right_encoder.Counts()) / 2. < expectedCounts);
@@ -675,8 +681,13 @@ void initiateServos() {
     base_servo.SetMin(BASE_SERVO_MIN);
     base_servo.SetMax(BASE_SERVO_MAX);
 
+    // Calibrate on-arm servo
+    on_arm_servo.SetMin(ON_ARM_SERVO_MIN);
+    on_arm_servo.SetMax(ON_ARM_SERVO_MAX);
+
     // Sets base servo to initial degree
-    base_servo.SetDegree(90.);
+    base_servo.SetDegree(0.);
+    on_arm_servo.SetDegree(180.);
 }
 
 /*******************************************************
@@ -882,7 +893,7 @@ void pressJukeboxButtons() {
  * 
  * @param status Status to be printed
  */
-void writeStatus(char status[]) {
+void writeStatus(const char status[]) {
     LCD.SetFontColor(BACKGROUND_COLOR);
     LCD.FillRectangle(0, 17,319,17);
     LCD.SetFontColor(FONT_COLOR);
@@ -940,31 +951,79 @@ void runCourse(int courseNumber) {
     {
     case TEST_COURSE_1: // Test course 1
         writeStatus("Running Test 1");
+
+        int xGarb, yGarb;
+
         Sleep(1.0);
-        turn_left_degrees(20, 90);
+        while(true) {
+            writeStatus("Press to turn left.");
+            while(!LCD.Touch(&xGarb, &yGarb));
+            turn_left_degrees(20, 90);
+            while(!LCD.Touch(&xGarb, &yGarb));
+            turn_right_degrees(20, 90);
+        }
         writeStatus("Complete.");
         break;
 
     case TEST_COURSE_2: // Test course 1
         writeStatus("Running Test 2");
+
+        int xTrash2, yTrash2;
+
         Sleep(1.0);
+        writeStatus("Press to move forward");
+        
+        while(!LCD.Touch(&xTrash2, &yTrash2));
         while(true) {
-            move_forward_inches(20, 2);
+            move_forward_inches(20, 9999);
         }
         break;
 
     case TEST_COURSE_3: // Test course 1
         writeStatus("Running Test 3");
-        Sleep(1.0);
-        base_servo.SetDegree(180.);
-        Sleep(1.0);
-        base_servo.SetDegree(0.);
+
+        float degreesToTurn;
+        int xTrash, yTrash;
+        degreesToTurn = 90.0;
+        on_arm_servo.SetDegree(degreesToTurn);
+
+        while (true) {
+            while(!LCD.Touch(&xTrash, &yTrash));
+                LCD.Clear();
+                if (xTrash > 160) {
+                    if ((degreesToTurn - 1.0) >= 0) {
+                        degreesToTurn -= 1.0;
+                        on_arm_servo.SetDegree(degreesToTurn);
+                    }
+                } else {
+                    if ((degreesToTurn + 1.0) <= 180) {
+                        degreesToTurn += 1.0;
+                        on_arm_servo.SetDegree(degreesToTurn);
+                    }
+                }
+                LCD.WriteRC(degreesToTurn, 1, 2);
+        }
+
         break;
 
     case CALIBRATE_SERVOS:
-        LCD.Write("Calibrating Servos");
+        writeStatus("Calibrating Servos");
         Sleep(1.0);
-        base_servo.TouchCalibrate();
+        writeStatus("L -> base | R -> arm");
+
+        int xTrash420, yTrash69;
+
+        // Waits for touch. If touch is on left then base_servo is calibrated, and vice versa
+        while(!LCD.Touch(&xTrash420, &yTrash69));
+
+        LCD.DrawVerticalLine(160, 0, 239);
+
+        if (xTrash420 < 160) {
+            base_servo.TouchCalibrate();
+        } else if (xTrash420 > 160) {
+            on_arm_servo.TouchCalibrate();
+        }
+
         break;
 
     case PERF_COURSE_1: // Performance Test 1
@@ -1112,7 +1171,84 @@ void runCourse(int courseNumber) {
         
 
     case PERF_COURSE_2: // Performance Test 2
+
+        /****
+         * 
+         * Algorithm for Performance Test 2 
+         * 
+         * 1. Move forward 11.55 inches + DIST_AXIS_CDS (Aligns with ramp)
+         * 
+         * 2. Turn right 45 degrees (Straight at ramp)
+         * 
+         * 3. Move forward 8.1 inches (Base of ramp)
+         * 
+         * 4. Move forward 10.3 inches (Top of ramp)
+         * 
+         * 5. Move forward 13.35 inches + DIST_ACIS_CDS 
+         * 
+         * 6. Turn right 90 degrees (To reverse towards sink)
+         * 
+         * 7. Reverse 10.5 inches 
+         * 
+         * 8. Turn left 90 degrees (To reverse towards sink)
+         * 
+         * 9. Reverse 7 inches (To sink)
+         * 
+         * 10. Drop tray
+         * 
+         * 11. More forward 7 inches (From sink)
+         * 
+         * 12. Turn left 90 degrees (To reverse towards ticket) 
+         * 
+         * 13. Reverse 10.5 inches
+         * 
+         * 14. Reverse 12.15 inches (Towards ticket)
+         * 
+         * 15. Turn left 90 degrees (front towards ticket)
+         * 
+         * 16. Move forard 8.1 inches (Front of ticket)
+         * 
+         * 17. Slide ticket
+         * 
+         */
+
         LCD.Write("Running Performance Test 2");
+
+        Sleep(1.0);
+
+    
+        writeStatus("Aligning with ramp");
+        move_forward_inches(20, 11.55 + DIST_AXIS_CDS);
+        turn_right_degrees(20, 45);
+
+        writeStatus("Moving up ramp");
+        move_forward_inches(40, 31.75 + DIST_AXIS_CDS);
+
+        writeStatus("Moving towards sink");
+        turn_right_degrees(20, 90);
+        move_forward_inches(-20, 10.5); // Reverses
+        turn_left_degrees(20, 90);
+        move_forward_inches(-20, 7);
+    
+        writeStatus("Dropping tray");
+
+        base_servo.SetDegree(90.);
+        Sleep(1.0);
+        base_servo.SetDegree(105.);
+        Sleep(1.0);
+
+        writeStatus("Moving away from sink");
+        move_forward_inches(20, 7);
+        turn_left_degrees(20, 90);
+        move_forward_inches(-20, 10.5);
+
+        writeStatus("Moving towards ticket");
+        move_forward_inches(-20, 12.15);
+        turn_left_degrees(20, 90);
+        move_forward_inches(20, 8.1);
+
+        writeStatus("Sliding ticket");
+    
         break;
 
     case PERF_COURSE_3: // Performance Test 3

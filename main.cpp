@@ -5,33 +5,9 @@
 /*      Steven Broaddus, Conolly Burgess     */
 /*        Joseph Richmond, Jake Chang        */
 /*                                           */
-/*            Updated 3/2/2022               */
+/*            Updated 3/7/2022               */
 /*       Uses Doxygen for documentation      */
 /*********************************************/
-
-/*
- * Game plan for tonight: 
- *
- * 1. Commit current code to GitHub for backup
- * 
- * 1.5. Clean code of any obvious issues.
- * 
- * 2. Check online documentation to see how much slower reversing motors are 
- * than forward Igwan motors.
- * 
- * 3. Get robot to drive straight (calibrate right motor)
- * 
- * 4. See if calibrated right motor can turn degress with accuracy. 
- * If not possible with both wheels, use only one forward wheel.
- * 
- * 5. Take detailed measurements of robot or check for Joe's model.
- * 
- * 5. Map out course with dimensions of robot accounted for. This will use the turn that 
- * I deem most accurate.
- * 
- * 6. Get to a decent spot.
- * 
- */
 
 /************************************************/
 // Include preprocessor directives
@@ -67,32 +43,6 @@
 #define ON_ARM_SERVO_MIN 500
 #define ON_ARM_SERVO_MAX 2400
 
-// Global variables for PID (Will make class later)
-
-// PID Right Motor
-double PID_Linear_SpeedR, PID_New_CountsR, PID_Last_CountsR, PID_New_TimeR, PID_Last_TimeR, PID_New_Speed_ErrorR, PID_Last_Speed_ErrorR, PID_Error_SumR;
-float PID_NEW_MOTOR_POWERR, PID_OLD_MOTOR_POWERR;
-double PTermR, ITermR, DTermR;
-
-double PConstR = 0.75;
-double IConstR = 0.05; 
-double DConstR = 0.25;
-
-// PID Left Motor
-double PID_Linear_SpeedL, PID_New_CountsL, PID_Last_CountsL, PID_New_TimeL, PID_Last_TimeL, PID_New_Speed_ErrorL, PID_Last_Speed_ErrorL, PID_Error_SumL;
-float PID_NEW_MOTOR_POWERL, PID_OLD_MOTOR_POWERL;
-double PTermL, ITermL, DTermL;
-
-double PConstL = 0.75; // 0.75
-double IConstL = 0.05; 
-double DConstL = 0.25;
-
-// Both
-double PID_TIME;
-double PID_DISTANCE_PER_COUNT = ((2 * 3.14159265 * 1.25) / 318);
-
-#define SLEEP_PID 0.15
-
 /************************************************/
 // Course numbers. Used in startMenu() and runCourse()
 enum { 
@@ -125,6 +75,7 @@ void runCourse(int courseNumber); // Runs the course specified by startUp()
 
 /************************************************/
 // Declarations for encoders/motors
+// WHITE ENCODER -> LEFT MOTOR
 DigitalEncoder right_encoder(FEHIO::P3_2);
 DigitalEncoder left_encoder(FEHIO::P3_1);
 FEHMotor right_motor(FEHMotor::Motor2,9.0);
@@ -667,215 +618,6 @@ void turn_left_degrees(int percent, float degrees) {
     LCD.WriteRC(right_encoder.Counts(), 12, 20);
 }
 
-/*******************************************************************/
-// PID STUFF
-
-void ResetPIDVariables() {
-    
-    // Resets all variables to inital state
-    PID_Linear_SpeedR = 0;
-    PID_New_CountsR = 0;
-    PID_Last_CountsR = 0;
-    PID_New_TimeR = 0;
-    PID_Last_TimeR = 0;
-    PID_New_Speed_ErrorR = 0;
-    PID_Last_Speed_ErrorR = 0;
-    PID_OLD_MOTOR_POWERR = 0;
-    PID_NEW_MOTOR_POWERR = 0;
-    PID_Linear_SpeedR = 0;
-    PTermR = 0;
-    ITermR = 0;
-    DTermR = 0;
-
-    PID_Linear_SpeedL = 0;
-    PID_New_CountsL = 0;
-    PID_Last_CountsL = 0;
-    PID_New_TimeL = 0;
-    PID_Last_TimeL = 0;
-    PID_New_Speed_ErrorL = 0;
-    PID_Last_Speed_ErrorL = 0;
-    PID_OLD_MOTOR_POWERL = 0;
-    PID_NEW_MOTOR_POWERL = 0;
-    PID_Linear_SpeedL = 0;
-    PTermL = 0;
-    ITermL = 0;
-    DTermL = 0;
-    
-    // Records initial time
-    PID_TIME = TimeNow();
-
-    // Resets encoders
-    left_encoder.ResetCounts();
-    right_encoder.ResetCounts();
-
-    Sleep(0.15);
-}
-
-float RightPIDAdjustment(double expectedSpeed) {
-
-    // Finds change in counts since last time
-    PID_Last_CountsR = PID_New_CountsR;
-    PID_New_CountsR = right_encoder.Counts();
-    
-    // Finds change in time since last time
-    PID_Last_TimeR = PID_New_TimeR;
-    PID_New_TimeR = TimeNow();
-
-    // Finds actual velocity
-    PID_Linear_SpeedR = (PID_DISTANCE_PER_COUNT * ((PID_New_CountsR - PID_Last_CountsR) / (PID_New_TimeR - PID_Last_TimeR)));
-
-    // Finds error
-    PID_New_Speed_ErrorR = expectedSpeed - PID_Linear_SpeedR;
-
-    // Adds error to error sum
-    PID_Error_SumR += PID_New_Speed_ErrorR;
-
-    // Calculates PTerm
-    PTermR = PID_New_Speed_ErrorR * PConstR;
-
-    // Calculates ITerm
-    ITermR = PID_Error_SumR * IConstR;
-
-    // Calculates DTerm
-    DTermR = (PID_New_Speed_ErrorR - PID_Last_Speed_ErrorR) * DConstR;
-
-    // Saves past error
-    PID_Last_Speed_ErrorR = PID_New_Speed_ErrorR;
-
-    return (PID_OLD_MOTOR_POWERR + PTermR + ITermR + DTermR);
-}
-
-float LeftPIDAdjustment(double expectedSpeed) {
-    
-    // Finds change in counts since last time
-    PID_Last_CountsL = PID_New_CountsL;
-    PID_New_CountsL = left_encoder.Counts();
-    
-    // Finds change in time since last time
-    PID_Last_TimeL = PID_New_TimeL;
-    PID_New_TimeL = TimeNow();
-
-    // Finds actual velocity
-    PID_Linear_SpeedL = (PID_DISTANCE_PER_COUNT * ((PID_New_CountsL - PID_Last_CountsL) / (PID_New_TimeL - PID_Last_TimeL)));
-
-    // Finds error
-    PID_New_Speed_ErrorL = expectedSpeed - PID_Linear_SpeedL;
-
-    // Adds error to error sum
-    PID_Error_SumL += PID_New_Speed_ErrorL;
-
-    // Calculates PTerm
-    PTermL = PID_New_Speed_ErrorL * PConstL;
-
-    // Calculates ITerm
-    ITermL = PID_Error_SumL * IConstL;
-
-    // Calculates DTerm
-    DTermL = (PID_New_Speed_ErrorL - PID_Last_Speed_ErrorL) * DConstL;
-
-    // Saves past error
-    PID_Last_Speed_ErrorL = PID_New_Speed_ErrorL;
-
-    return (PID_OLD_MOTOR_POWERL + PTermL + ITermL + DTermL);
-}
-
-void move_forward_PID(float in_per_sec, float inches) {
-
-    ResetPIDVariables();
-
-    while ((((left_encoder.Counts() + right_encoder.Counts()) / 2) * PID_DISTANCE_PER_COUNT) < inches) {
-        
-        PID_NEW_MOTOR_POWERR = RightPIDAdjustment(in_per_sec);
-        PID_NEW_MOTOR_POWERL = LeftPIDAdjustment(in_per_sec);
-        
-        right_motor.SetPercent(PID_NEW_MOTOR_POWERR);
-        left_motor.SetPercent(PID_NEW_MOTOR_POWERL);
-
-        PID_OLD_MOTOR_POWERR = PID_NEW_MOTOR_POWERR;
-        PID_OLD_MOTOR_POWERL = PID_NEW_MOTOR_POWERL;
-
-        Sleep(SLEEP_PID);
-    }
-
-    right_motor.Stop();
-    left_motor.Stop();
-    
-}
-
-void turn_left_PID(float in_per_sec, float degrees) {
-
-    double inches = ((degrees * PI) / 180.0) * (7.5 / 2);
-
-    ResetPIDVariables();
-
-    while ((((left_encoder.Counts() + right_encoder.Counts()) / 2) * PID_DISTANCE_PER_COUNT) < inches) {
-        
-        PID_NEW_MOTOR_POWERR = RightPIDAdjustment(in_per_sec);
-        PID_NEW_MOTOR_POWERL = LeftPIDAdjustment(in_per_sec);
-        
-        right_motor.SetPercent(PID_NEW_MOTOR_POWERR);
-        left_motor.SetPercent(-PID_NEW_MOTOR_POWERL);
-
-        PID_OLD_MOTOR_POWERR = PID_NEW_MOTOR_POWERR;
-        PID_OLD_MOTOR_POWERL = PID_NEW_MOTOR_POWERL;
-
-        Sleep(SLEEP_PID);
-    }
-
-    right_motor.Stop();
-    left_motor.Stop();
-    
-}
-
-void turn_right_PID(float in_per_sec, float degrees) {
-
-    double inches = ((degrees * PI) / 180.0) * (7.5 / 2);
-
-    ResetPIDVariables();
-
-    while ((((left_encoder.Counts() + right_encoder.Counts()) / 2) * PID_DISTANCE_PER_COUNT) < inches) {
-        
-        PID_NEW_MOTOR_POWERR = RightPIDAdjustment(in_per_sec);
-        PID_NEW_MOTOR_POWERL = LeftPIDAdjustment(in_per_sec);
-        
-        right_motor.SetPercent(-PID_NEW_MOTOR_POWERR);
-        left_motor.SetPercent(PID_NEW_MOTOR_POWERL);
-
-        PID_OLD_MOTOR_POWERR = PID_NEW_MOTOR_POWERR;
-        PID_OLD_MOTOR_POWERL = PID_NEW_MOTOR_POWERL;
-
-        Sleep(SLEEP_PID);
-    }
-
-    right_motor.Stop();
-    left_motor.Stop();
-    
-}
-
-void reverse_PID(float in_per_sec, float inches) {
-
-    ResetPIDVariables();
-
-    while ((((left_encoder.Counts() + right_encoder.Counts()) / 2) * PID_DISTANCE_PER_COUNT) < inches) {
-        
-        PID_NEW_MOTOR_POWERR = RightPIDAdjustment(in_per_sec);
-        PID_NEW_MOTOR_POWERL = LeftPIDAdjustment(in_per_sec);
-        
-        right_motor.SetPercent(-PID_NEW_MOTOR_POWERR);
-        left_motor.SetPercent(-PID_NEW_MOTOR_POWERL);
-
-        PID_OLD_MOTOR_POWERR = PID_NEW_MOTOR_POWERR;
-        PID_OLD_MOTOR_POWERL = PID_NEW_MOTOR_POWERL;
-
-        Sleep(SLEEP_PID);
-    }
-
-    right_motor.Stop();
-    left_motor.Stop();
-    
-}
-
-
 /*******************************************************
  * @brief Initiates both servos, sets min/max values and 
  * turns it to starting rotation.
@@ -891,8 +633,9 @@ void initiateServos() {
     on_arm_servo.SetMax(ON_ARM_SERVO_MAX);
 
     // Sets base servo to initial degree
-    base_servo.SetDegree(85.);
-    on_arm_servo.SetDegree(180.);
+    //base_servo.SetDegree(85.);
+    base_servo.SetDegree(0.); // TESTING
+    on_arm_servo.SetDegree(8.);
 }
 
 /*******************************************************
@@ -1061,6 +804,129 @@ void pressJukeboxButtons() {
     } else {
         LCD.Write("ERROR: COLOR NOT READ SUCCESFULLY");
     }
+}
+
+/*******************************************************
+ * @brief Algorithm for flipping the hot plate when robot is ~13 inches in front of it. 
+ * Facing directly at it.
+ * 
+ */
+void flipBurger() {
+
+    writeStatus("Flipping hot plate");
+
+    //base_servo.SetDegree(85);
+    //on_arm_servo.SetDegree(15);
+
+    //Sleep(2.0);
+
+    //base_servo.SetDegree(5);
+    //move_forward_inches(20, 1);
+    
+    //Sleep(1.0);
+
+    // Moves forward while raising base arm
+    //right_motor.SetPercent(20);
+    //left_motor.SetPercent(20);
+
+    base_servo.SetDegree(20);
+
+    move_forward_inches(20, 2.75);
+
+    base_servo.SetDegree(45);
+
+    //Sleep(1.0);
+    move_forward_inches(20, 0.75);
+
+    Sleep(1.0);
+
+    on_arm_servo.SetDegree(180);
+
+    Sleep(2.0);
+
+    move_forward_inches(-20, 3.5);
+
+    //right_motor.Stop();
+    //left_motor.Stop();
+
+    //Sleep(1.0);
+
+    // Reverses back
+    //right_motor.SetPercent(-20);
+    //left_motor.SetPercent(-20);
+
+    //Sleep(2.25);
+
+    //right_motor.Stop();
+    //left_motor.Stop();
+
+    writeStatus("Moving towards other side");
+    on_arm_servo.SetDegree(10);
+    Sleep(0.5);
+    base_servo.SetDegree(85);
+    turn_left_degrees(20, 90);
+    move_forward_inches(-20, 6.3);
+    turn_right_degrees(20, 90);
+    on_arm_servo.SetDegree(180);
+
+    writeStatus("Returning hot plate");
+    move_forward_inches(20, 3.75);
+    base_servo.SetDegree(65);
+    Sleep(1.0);
+    on_arm_servo.SetDegree(15);
+    Sleep(2.0);
+    on_arm_servo.SetDegree(180);
+    Sleep(1.0);
+    base_servo.SetDegree(85);
+    
+}
+
+/*******************************************************
+ * @brief Flips the correct ice cream lever. 
+ * 
+ * @pre RPS must be initialized.
+ */
+void flipIceCreamLever() {
+
+    writeStatus("Pushing lever down");
+    base_servo.SetDegree(85);
+    move_forward_inches(20, 3);
+    base_servo.SetDegree(60);
+    Sleep(7.0);
+
+    writeStatus("Pushing lever up");
+    move_forward_inches(-20, 3);
+    base_servo.SetDegree(0); 
+    move_forward_inches(20, 3);
+    base_servo.SetDegree(60);
+    move_forward_inches(-20, 3);
+
+    /*
+    if (RPS.GetIceCream() == 0) { // VANILLA
+
+        
+
+    } else if (RPS.GetIceCream() == 1) { // TWIST
+
+        writeStatus("Pushing lever down");
+        base_servo.SetDegree(85);
+        move_forward_inches(20, 3);
+        base_servo.SetDegree(60);
+        Sleep(7.0);
+
+        writeStatus("Pushing lever up");
+        move_forward_inches(-20, 3);
+        base_servo.SetDegree(0); 
+        move_forward_inches(20, 3);
+        base_servo.SetDegree(60);
+        move_forward_inches(-20, 3);
+
+    } else if (RPS.GetIceCream() == 2) { // CHOCOLATE
+
+    } else {
+        writeStatus("ERROR. ICE CREAM LEVER NOT SPECIFIED.");
+    }*/
+
 }
 
 /*******************************************************
@@ -1474,8 +1340,106 @@ void runCourse(int courseNumber) {
         break;
 
     case PERF_COURSE_3: // Performance Test 3
-        LCD.Write("Running Performance Test 3");
 
+        /****
+         * 
+         * Algorithm for Performance Test 3
+         * 
+         * 1. Move forward 11.55 inches + DIST_AXIS_CDS (Aligns with ramp)
+         * 
+         * 2. Turn right 45 degrees (Straight at ramp)
+         * 
+         * 3. Move forward 8.1 inches (Base of ramp)
+         * 
+         * 4. Move forward 10.3 inches (Top of ramp)
+         * 
+         * 5. Move forward 16.86 inches + DIST_AXIS_CDS (In front of center ice cream lever)
+         * 
+         * 6. Turn right 90 degrees (move towards hot plate)
+         * 
+         * 7. Move forward 6.6 inches 
+         * 
+         * 8. Turn left 90 degrees (face towards hot plate)
+         * 
+         * // From wheel axis to tip of upper arm -> 13 inches
+         * 9. Lower base servo and move upper arm into place
+         *    
+         * 10. LIFT HOT PLATE
+         *     Move forward while lifting base arm (upper arm is lifting hot plate)
+         *     Turn arm servo right to finish flip
+         *     Return arm servo to straight position
+         *     
+         *    
+         * 11. Lift base arm after lifting hot plate
+         * 
+         * 12. Turn left 90 degrees (moving towards other side of hot plate)
+         * 
+         * 13. Reverse 6.3 inches (in front of other side of hot plate)
+         * 
+         * 14. Turn right 90 degrees (facing towards other side of hot plate)
+         * 
+         * 15. RETURN HOT PLATE
+         *     lower base servo (~60 degrees)
+         *     extend arm servo to front position (90 degrees)
+         *     turn arm servo left to flip back (0 degrees)
+         *     turn arm servo back to side (180 degrees)
+         *     lift base servo (85 degrees)
+         *  
+         * 16. Turn left 90 degrees (Moving towards ice cream lever)
+         * 
+         * 17. Move forward 12.9 inches + DIST_AXIS_CDS (Moving towards ice cream lever)
+         *     
+         * 18. Turn right 45 degrees (facing towards ice cream lever)
+         * 
+         * 19. Raise base servo (85 degrees)
+         * 
+         * 20. Move forward 3 inches (lower arm over ice cream lever)
+         * 
+         * 21. Lower base arm  (~60 degrees)
+         * 
+         * 22. Sleep 7 seconds
+         * 
+         * 23. Reverse 3 inches
+         * 
+         * 24. Lower base arm (0 degrees) 
+         * 
+         * 25. Move forward 3 inches
+         * 
+         * 26. Raise base arm (~60 degrees) Flip lever back up
+         * 
+         * 27. Reverse 3 inches
+         * 
+         * 28. Win.
+         */ 
+
+        LCD.Write("Running Performance Test 3");
+        Sleep(1.0);
+
+        writeStatus("Aligning with ramp");
+        move_forward_inches(20, 11.55 + DIST_AXIS_CDS);
+        turn_right_degrees(20, 45);
+
+        writeStatus("Moving up ramp");
+        move_forward_inches(42, 35.26 + DIST_AXIS_CDS);
+
+        writeStatus("Moving towards hot plate");
+        turn_right_degrees(20, 90);
+        move_forward_inches(20, 5.5);
+        turn_left_degrees(20, 92);
+
+        Sleep(2.0);
+
+        /*
+        // Flips burger when robot is ~13 inches in front, facing towards it
+        flipBurger();
+        */
+
+        writeStatus("Moving towards ice cream lever");
+        turn_left_degrees(20, 90);
+        move_forward_inches(20, 12.9 + DIST_AXIS_CDS);
+        turn_right_degrees(20, 45);
+
+        
 
         break;
 
@@ -1506,19 +1470,28 @@ int main() {
 
     // Initiates servos
     initiateServos();
+    Sleep(1.0);
 
     // Initializes RPS
     //RPS.InitializeTouchMenu();
 
     // Initializes menu and returns chosen course number
-    int courseNumber = startMenu();
+    //int courseNumber = startMenu();
 
     //Waits until start light is read
-    readStartLight();
-    Sleep(1.0);
+    //readStartLight();
+    //Sleep(1.0);
 
     // Runs specified course number.
-    runCourse(courseNumber);
+    //runCourse(courseNumber);
+    //runCourse(PERF_COURSE_3);
+
+
+    // Test, flips burger when robot is 13 inches in front of hot plate, facing towards it
+    flipBurger();
+
+    // TEST
+    //flipIceCreamLever();
 
     return 0;
 }

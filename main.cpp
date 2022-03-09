@@ -43,8 +43,19 @@
 #define ON_ARM_SERVO_MIN 500
 #define ON_ARM_SERVO_MAX 2400
 
+// RPS pulse values
+#define RPS_DELAY_TIME 0.35 // Time that the RPS takes to check again before correcting
+
+#define RPS_TURN_PULSE_PERCENT 20 // Percent at which motors will pulse to correct movement while turning
+#define RPS_TURN_PULSE_TIME 0.1 // Time that the wheels pulse for to correct heading
+#define RPS_TURN_THRESHOLD 1 // Degrees that the heading can differ from before calling it a day
+
+#define RPS_TRANSLATIONAL_PULSE_PERCENT 20 // Percent at which motors will pulse to correct translational movement
+#define RPS_TRANSLATIONAL_PULSE_TIME 0.25 // Time that the wheels pulse for to correct translational coords
+#define RPS_TRANSLATIONAL_THRESHOLD 1 // Coord units that the robot can be in range of
+
 /************************************************/
-// Course numbers. Used in startMenu() and runCourse()
+// Course numbers. Used in start_menu() and run_course()
 enum { 
             TEST_COURSE_1 = 1, 
             TEST_COURSE_2 = 2, 
@@ -61,17 +72,23 @@ enum {
 /************************************************/
 // Function Prototypes
 int confirmation(const char prompt[], int xPrompt, int yPrompt); // Prompts the user to confirm a choice
-void drawMainMenuScreen(FEHIcon::Icon test_button, FEHIcon::Icon perf_test_button, FEHIcon::Icon competition_button); // Draws the main menu screen
-int startMenu(); // Sets up a starting menu for the user.
-int readStartLight(); // Waits for the start light
+void draw_main_menu_screen(FEHIcon::Icon test_button, FEHIcon::Icon perf_test_button, FEHIcon::Icon competition_button); // Draws the main menu screen
+int start_menu(); // Sets up a starting menu for the user.
+int read_start_light(); // Waits for the start light
 void move_forward_inches(int percent, float inches); // Moves forward number of inches
+void move_forward_seconds(float percent, float seconds); // Moves forward for a number of seconds
 void turn_right_degrees(int percent, float degrees); // Turns right a specified number of degrees
 void turn_left_degrees(int percent, float degrees); // Turns left a specified amount of degrees
-int detectColor(int timeToDetect); // Detects the color of the jukebox
-void pressJukeboxButtons(); // Presses the jukebox buttons
-void writeStatus(const char status[]); // Clears room for a printed string w/o clearing display
-void showRPSData(); // Shows basic RPS data for the robot
-void runCourse(int courseNumber); // Runs the course specified by startUp()
+void RPS_correct_heading(float heading); // Corrects the heading of the robot using RPS
+void RPS_check_x(float x_coord); // Corrects the x-coord of the robot using RPS
+void RPS_check_y(float y_coord); // Corrects the y-coord of the robot using RPS
+int detect_color(int timeToDetect); // Detects the color of the jukebox
+void press_jukebox_buttons(); // Presses the jukebox buttons
+void flip_burger(); // Flips the hot plate and burger
+void flip_ice_cream_lever(); // Flips the correct ice cream lever
+void write_status(const char status[]); // Clears room for a printed string w/o clearing display
+void show_RPS_data(); // Shows basic RPS data for the robot
+void run_course(int courseNumber); // Runs the course specified by startUp()
 
 /************************************************/
 // Declarations for encoders/motors
@@ -168,7 +185,7 @@ int confirmation(const char prompt[], int xPrompt, int yPrompt) {
  * @param perf_test_button Button that leads to the performance test menu
  * @param competition_button Button that leads to the competition test menu
  */
-void drawMainMenuScreen(FEHIcon::Icon test_button, FEHIcon::Icon perf_test_button, FEHIcon::Icon competition_button) {
+void draw_main_menu_screen(FEHIcon::Icon test_button, FEHIcon::Icon perf_test_button, FEHIcon::Icon competition_button) {
     
     // Sleeps to show "pressed" status of other buttons
     Sleep(BUTTON_TIME_TO_SLEEP);
@@ -194,7 +211,7 @@ void drawMainMenuScreen(FEHIcon::Icon test_button, FEHIcon::Icon perf_test_butto
  * 
  * @return int Course chosen, see defined course number enum.
  */
-int startMenu() {
+int start_menu() {
     
     // Coordinates for touch
     float xTouch, yTouch; 
@@ -237,7 +254,7 @@ int startMenu() {
     int screen = MAIN_MENU;
 
     // Draws the MAIN_MENU
-    drawMainMenuScreen(test_button, perf_test_button, competition_button);
+    draw_main_menu_screen(test_button, perf_test_button, competition_button);
 
     // Repeats until the user hasn't chosen a course and confirmed it
     while (!courseChosen && !confirmed) {
@@ -312,7 +329,7 @@ int startMenu() {
                             courseChosen = TEST_COURSE_1;
                         } else {
                             screen = MAIN_MENU;
-                            drawMainMenuScreen(test_button, perf_test_button, competition_button);
+                            draw_main_menu_screen(test_button, perf_test_button, competition_button);
                         }
                         break;
 
@@ -321,7 +338,7 @@ int startMenu() {
                             courseChosen = TEST_COURSE_2;
                         } else {
                             screen = MAIN_MENU;
-                            drawMainMenuScreen(test_button, perf_test_button, competition_button);
+                            draw_main_menu_screen(test_button, perf_test_button, competition_button);
                         }
                         break;
                         
@@ -330,7 +347,7 @@ int startMenu() {
                             courseChosen = TEST_COURSE_3;
                         } else {
                             screen = MAIN_MENU;
-                            drawMainMenuScreen(test_button, perf_test_button, competition_button);
+                            draw_main_menu_screen(test_button, perf_test_button, competition_button);
                         }
                         break;
                     case 4:
@@ -338,7 +355,7 @@ int startMenu() {
                             courseChosen = CALIBRATE_SERVOS;
                         } else {
                             screen = MAIN_MENU;
-                            drawMainMenuScreen(test_button, perf_test_button, competition_button);
+                            draw_main_menu_screen(test_button, perf_test_button, competition_button);
                         }
                         break;
     
@@ -369,7 +386,7 @@ int startMenu() {
                             courseChosen = PERF_COURSE_1;
                         } else {
                             screen = MAIN_MENU;
-                            drawMainMenuScreen(test_button, perf_test_button, competition_button);
+                            draw_main_menu_screen(test_button, perf_test_button, competition_button);
                         }
                         break;
 
@@ -378,7 +395,7 @@ int startMenu() {
                             courseChosen = PERF_COURSE_2;
                         } else {
                             screen = MAIN_MENU;
-                            drawMainMenuScreen(test_button, perf_test_button, competition_button);
+                            draw_main_menu_screen(test_button, perf_test_button, competition_button);
                         }
                         break;
 
@@ -387,7 +404,7 @@ int startMenu() {
                             courseChosen = PERF_COURSE_3;
                         } else {
                             screen = MAIN_MENU;
-                            drawMainMenuScreen(test_button, perf_test_button, competition_button);
+                            draw_main_menu_screen(test_button, perf_test_button, competition_button);
                         }
                         break;
 
@@ -396,7 +413,7 @@ int startMenu() {
                             courseChosen = PERF_COURSE_4;
                         } else {
                             screen = MAIN_MENU;
-                            drawMainMenuScreen(test_button, perf_test_button, competition_button);
+                            draw_main_menu_screen(test_button, perf_test_button, competition_button);
                         }
                         break;
                     default:
@@ -426,7 +443,7 @@ int startMenu() {
                             courseChosen = IND_COMP;
                         } else {
                             screen = MAIN_MENU;
-                            drawMainMenuScreen(test_button, perf_test_button, competition_button);
+                            draw_main_menu_screen(test_button, perf_test_button, competition_button);
                         }
                         break;
 
@@ -435,7 +452,7 @@ int startMenu() {
                             courseChosen = FINAL_COMP;
                         } else {
                             screen = MAIN_MENU;
-                            drawMainMenuScreen(test_button, perf_test_button, competition_button);
+                            draw_main_menu_screen(test_button, perf_test_button, competition_button);
                         }
                         break;
 
@@ -458,12 +475,12 @@ int startMenu() {
  *         1 -> ON
  *         0 -> OFF
  */
-int readStartLight() {
+int read_start_light() {
     LCD.Clear();
 
     int lightOn = 0;
 
-    writeStatus("Waiting for light");
+    write_status("Waiting for light");
 
     // Waits until light is detected
     while (!lightOn) {
@@ -474,7 +491,7 @@ int readStartLight() {
         // If 
         if (CdS_cell.Value() < 0.345) {
             lightOn = 1;
-            writeStatus("GO!");
+            write_status("GO!");
         }
     }
 
@@ -524,6 +541,25 @@ void move_forward_inches(int percent, float inches) {
     LCD.WriteRC(left_encoder.Counts(), 11, 20);
     LCD.WriteRC("Actual RE Counts: ", 12, 1);
     LCD.WriteRC(right_encoder.Counts(), 12, 20);
+}
+
+/*******************************************************
+ * @brief Moves forward for the specified time at the specified percentage.
+ * 
+ * @param percent Percent that the motors will drive at
+ * @param seconds Time that the motors will drive for
+ */
+void move_forward_seconds(float percent, float seconds) {
+    
+    // Set both motors to passed percentage
+    right_motor.SetPercent(percent);
+    left_motor.SetPercent(percent);
+
+    Sleep(seconds);
+
+    // Turns off motors after elapsed time
+    right_motor.Stop();
+    left_motor.Stop();
 }
 
 /*******************************************************
@@ -619,6 +655,220 @@ void turn_left_degrees(int percent, float degrees) {
 }
 
 /*******************************************************
+ * @brief Corrects the heading using RPS, pulses to correct heading
+ * 
+ * @param headingDegrees Heading to correct to in degrees
+ */
+void RPS_correct_heading(float heading) {
+    /*
+     * Determines the direction to turn to get to the desired heading faster
+     * 1 -> CW
+     * -1 -> CCW
+     */ 
+    int direction = 0;
+
+    // Difference between the actual heading and the desired one
+    float difference;
+    if ((heading - RPS.Heading()) > 180) {
+        difference = abs((heading) - (RPS.Heading() + 360)); 
+    } else if ((RPS.Heading() - heading) > 180) {
+        difference = abs((heading + 360) - (RPS.Heading())); 
+    } else {
+        difference = abs((heading + 360) - (RPS.Heading() + 360)); 
+    }
+    
+    
+    // Determine the direction of the motors based on the orientation of the QR code
+    int power = RPS_TURN_PULSE_PERCENT;
+
+    // Check if receiving proper RPS coordinates and whether the robot is within an acceptable range
+    while((RPS.Heading() >= 0) && (difference > RPS_TURN_THRESHOLD))
+    {
+        // Checks which way to turn to turn the least
+        if (RPS.Heading() < heading) {
+            direction = 1;
+        } else {
+            direction = -1;
+        }
+
+        if (abs(RPS.Heading() - heading) > 180) {
+            direction = -direction;
+        }
+
+        // Pulses towards the ideal position
+        if (direction == 1) {
+
+            // PULSES COUNTERCLOCKWISE
+            // Set both motors to desired percent
+            right_motor.SetPercent(RPS_TURN_PULSE_PERCENT);
+            left_motor.SetPercent(-RPS_TURN_PULSE_PERCENT - BACKWARDS_CALIBRATOR);
+
+            // Wait for the correct number of seconds
+            Sleep(RPS_TURN_PULSE_TIME);
+
+            // Turn off motors
+            right_motor.Stop();
+            left_motor.Stop();
+            
+        } else if (direction == -1) {
+
+            // PULSES CLOCKWISE
+            // Set both motors to desired percent
+            right_motor.SetPercent(-RPS_TURN_PULSE_PERCENT - BACKWARDS_CALIBRATOR);
+            left_motor.SetPercent(RPS_TURN_PULSE_PERCENT);
+
+            // Wait for the correct number of seconds
+            Sleep(RPS_TURN_PULSE_TIME);
+
+            // Turn off motors
+            right_motor.Stop();
+            left_motor.Stop();
+
+        }
+
+        // Waits a tiny bit before checking RPS again
+        Sleep(RPS_DELAY_TIME);
+
+        // Updates direction to turn to
+        if ((heading - RPS.Heading()) > 180) {
+            difference = abs((heading) - (RPS.Heading() + 360)); 
+        } else if ((RPS.Heading() - heading) > 180) {
+            difference = abs((heading + 360) - (RPS.Heading())); 
+        } else {
+            difference = abs((heading + 360) - (RPS.Heading() + 360)); 
+        }
+
+        show_RPS_data();
+    }
+}
+
+/*******************************************************
+ * @brief Checks and corrects the x-coord of the robot using RPS. Makes sure the robot is facing 
+ * east/west to correct movement
+ * 
+ * @param x_coord Desired x-coord of the robot
+ */
+void RPS_check_x(float x_coord) {
+
+    // Directions the robot needs to be facing to correct x-coord
+    enum { EAST, WEST };
+
+    // Initial heading of the robot
+    float orientation = RPS.Heading();
+
+    // Direction the robot is corrected to
+    int direction;
+
+    // Makes sure robot can be seen by RPS
+    if (orientation > 0) {
+
+        write_status("Correcting x with RPS");
+        
+        // Adjusts robot to be facing east/west based on initial orientation
+        if ((orientation <= 90) || (orientation >= 270)) {
+            RPS_correct_heading(0);
+            direction = EAST;
+        } else {
+            RPS_correct_heading(180);
+            direction = WEST;
+        }
+
+        // Determine the direction of the motors based on the direction the robot is facing
+        int power = RPS_TRANSLATIONAL_PULSE_PERCENT;
+        if(direction == WEST){
+            power = -RPS_TRANSLATIONAL_PULSE_PERCENT;
+        }
+
+        // Check if receiving proper RPS coordinates and whether the robot is within an acceptable range
+        while((RPS.X() > 0) && (abs(RPS.X() - x_coord) > RPS_TRANSLATIONAL_THRESHOLD))
+        {
+            if(RPS.X() > x_coord)
+            {
+                // Pulse the motors for a short duration in the correct direction
+                move_forward_seconds(-power, RPS_TRANSLATIONAL_PULSE_TIME);
+            }
+            else if(RPS.X() < x_coord)
+            {
+                // Pulse the motors for a short duration in the correct direction
+                move_forward_seconds(power, RPS_TRANSLATIONAL_PULSE_TIME);
+            }
+            Sleep(RPS_DELAY_TIME);
+
+            show_RPS_data();
+        }
+
+        RPS_correct_heading(orientation);
+
+
+    } else {
+        write_status("ERROR. RPS NOT READING.");
+    }
+}
+
+/*******************************************************
+ * @brief Checks and corrects the y-coord of the robot using RPS. Makes sure the robot is facing 
+ * north/south to correct movement.
+ * 
+ * @param y_coord Desired y-coord of the robot
+ */
+void RPS_check_y(float y_coord) {
+
+    // Directions the robot needs to be facing to correct y-coord
+    enum { NORTH, SOUTH };
+
+    // Initial heading of the robot
+    float orientation = RPS.Heading();
+
+    // Direction the robot is corrected to
+    int direction;
+
+    // Makes sure robot can be seen by RPS
+    if (orientation > 0) {
+
+        write_status("Correcting y with RPS");
+        
+        // Adjusts robot to be facing east/west based on initial orientation
+        if ((orientation >= 0) && (orientation <= 180)) {
+            RPS_correct_heading(90);
+            direction = NORTH;
+        } else {
+            RPS_correct_heading(270);
+            direction = SOUTH;
+        }
+
+        // Determine the direction of the motors based on the direction the robot is facing
+        int power = RPS_TRANSLATIONAL_PULSE_PERCENT;
+        if(direction == SOUTH){
+            power = -RPS_TRANSLATIONAL_PULSE_PERCENT;
+        }
+
+        // Check if receiving proper RPS coordinates and whether the robot is within an acceptable range
+        while((RPS.Y() > 0) && (abs(RPS.Y() - y_coord) > RPS_TRANSLATIONAL_THRESHOLD))
+        {
+            if(RPS.Y() > y_coord)
+            {
+                // Pulse the motors for a short duration in the correct direction
+                move_forward_seconds(-power, RPS_TRANSLATIONAL_PULSE_TIME);
+            }
+            else if(RPS.Y() < y_coord)
+            {
+                // Pulse the motors for a short duration in the correct direction
+                move_forward_seconds(power, RPS_TRANSLATIONAL_PULSE_TIME);
+            }
+            Sleep(RPS_DELAY_TIME);
+
+            show_RPS_data();
+        }
+
+        RPS_correct_heading(orientation);
+
+
+    } else {
+        write_status("ERROR. RPS NOT READING.");
+    }
+}
+
+/*******************************************************
  * @brief Initiates both servos, sets min/max values and 
  * turns it to starting rotation.
  */
@@ -633,8 +883,7 @@ void initiateServos() {
     on_arm_servo.SetMax(ON_ARM_SERVO_MAX);
 
     // Sets base servo to initial degree
-    //base_servo.SetDegree(85.);
-    base_servo.SetDegree(0.); // TESTING
+    base_servo.SetDegree(85.);
     on_arm_servo.SetDegree(8.);
 }
 
@@ -646,7 +895,7 @@ void initiateServos() {
  *          1 -> Blue
  * @param timeToDetect time the robot takes to detect if it doesn't see the color right away
  */
-int detectColor(int timeToDetect) {
+int detect_color(int timeToDetect) {
     LCD.Clear();
 
     // Color to be returned
@@ -725,7 +974,7 @@ int detectColor(int timeToDetect) {
  * @brief Presses jukebox buttons based on color.
  * @author Steven Broaddus
  */
-void pressJukeboxButtons() {
+void press_jukebox_buttons() {
     
     /*
      * Detects the color of the jukebox
@@ -733,7 +982,7 @@ void pressJukeboxButtons() {
      * 0 -> Red      
      * 1 -> Blue
      */ 
-    int color = detectColor(4);
+    int color = detect_color(4);
 
     // Responds to the jukebox light appropriately
     if (color == 0) { // On right path (red light)
@@ -811,74 +1060,62 @@ void pressJukeboxButtons() {
  * Facing directly at it.
  * 
  */
-void flipBurger() {
+void flip_burger() {
 
-    writeStatus("Flipping hot plate");
+    write_status("Flipping hot plate");
 
-    //base_servo.SetDegree(85);
-    //on_arm_servo.SetDegree(15);
+    //***********
+    // Initial flip
 
-    //Sleep(2.0);
-
-    //base_servo.SetDegree(5);
-    //move_forward_inches(20, 1);
-    
-    //Sleep(1.0);
-
-    // Moves forward while raising base arm
-    //right_motor.SetPercent(20);
-    //left_motor.SetPercent(20);
-
-    base_servo.SetDegree(20);
-
-    move_forward_inches(20, 2.75);
-
-    base_servo.SetDegree(45);
-
-    //Sleep(1.0);
-    move_forward_inches(20, 0.75);
+    // Raises arm
+    base_servo.SetDegree(85);
+    on_arm_servo.SetDegree(8);
 
     Sleep(1.0);
 
+    // Lowers base servo and moves it under hot plate
+    base_servo.SetDegree(0);
+    move_forward_inches(20, 2);
+    
+    Sleep(1.0);
+
+    // Raises arm and moves forward consecutively
+    base_servo.SetDegree(20);
+    move_forward_inches(20, 2.75);
+    base_servo.SetDegree(50);
+    move_forward_inches(20, 0.75);
+    turn_right_degrees(20, 5);
+    Sleep(1.0);
     on_arm_servo.SetDegree(180);
+    turn_left_degrees(20, 5);
 
     Sleep(2.0);
 
-    move_forward_inches(-20, 3.5);
+    //***********
+    // Return flip
 
-    //right_motor.Stop();
-    //left_motor.Stop();
-
-    //Sleep(1.0);
-
-    // Reverses back
-    //right_motor.SetPercent(-20);
-    //left_motor.SetPercent(-20);
-
-    //Sleep(2.25);
-
-    //right_motor.Stop();
-    //left_motor.Stop();
-
-    writeStatus("Moving towards other side");
-    on_arm_servo.SetDegree(10);
+    write_status("Moving towards other side");
+    on_arm_servo.SetDegree(8.); // Resets on arm servo position
+    move_forward_inches(-20, 5.5); // Reverse away from hot plate (3.5 + 2)
+    RPS_correct_heading(90);
     Sleep(0.5);
     base_servo.SetDegree(85);
     turn_left_degrees(20, 90);
-    move_forward_inches(-20, 6.3);
+    RPS_correct_heading(180);
+    move_forward_inches(-20, 6.3); // Initially 6.3
     turn_right_degrees(20, 90);
+    RPS_correct_heading(90);
     on_arm_servo.SetDegree(180);
 
-    writeStatus("Returning hot plate");
-    move_forward_inches(20, 3.75);
-    base_servo.SetDegree(65);
+    write_status("Returning hot plate");
+    move_forward_inches(20, 3.75); 
+    base_servo.SetDegree(50);
     Sleep(1.0);
     on_arm_servo.SetDegree(15);
     Sleep(2.0);
     on_arm_servo.SetDegree(180);
     Sleep(1.0);
     base_servo.SetDegree(85);
-    
 }
 
 /*******************************************************
@@ -886,20 +1123,23 @@ void flipBurger() {
  * 
  * @pre RPS must be initialized.
  */
-void flipIceCreamLever() {
+void flip_ice_cream_lever() {
 
-    writeStatus("Pushing lever down");
+    // Makes sure on arm servo is out of the way
+    on_arm_servo.SetDegree(180);
+
+    write_status("Pushing lever down");
     base_servo.SetDegree(85);
-    move_forward_inches(20, 3);
+    move_forward_inches(20, 6);
     base_servo.SetDegree(60);
     Sleep(7.0);
 
-    writeStatus("Pushing lever up");
-    move_forward_inches(-20, 3);
+    write_status("Pushing lever up");
+    move_forward_inches(-20, 6);
     base_servo.SetDegree(0); 
-    move_forward_inches(20, 3);
-    base_servo.SetDegree(60);
-    move_forward_inches(-20, 3);
+    move_forward_inches(20, 6);
+    base_servo.SetDegree(50);
+    move_forward_inches(-20, 6);
 
     /*
     if (RPS.GetIceCream() == 0) { // VANILLA
@@ -908,13 +1148,13 @@ void flipIceCreamLever() {
 
     } else if (RPS.GetIceCream() == 1) { // TWIST
 
-        writeStatus("Pushing lever down");
+        write_status("Pushing lever down");
         base_servo.SetDegree(85);
         move_forward_inches(20, 3);
         base_servo.SetDegree(60);
         Sleep(7.0);
 
-        writeStatus("Pushing lever up");
+        write_status("Pushing lever up");
         move_forward_inches(-20, 3);
         base_servo.SetDegree(0); 
         move_forward_inches(20, 3);
@@ -924,7 +1164,7 @@ void flipIceCreamLever() {
     } else if (RPS.GetIceCream() == 2) { // CHOCOLATE
 
     } else {
-        writeStatus("ERROR. ICE CREAM LEVER NOT SPECIFIED.");
+        write_status("ERROR. ICE CREAM LEVER NOT SPECIFIED.");
     }*/
 
 }
@@ -935,7 +1175,7 @@ void flipIceCreamLever() {
  * 
  * @param status Status to be printed
  */
-void writeStatus(const char status[]) {
+void write_status(const char status[]) {
     LCD.SetFontColor(BACKGROUND_COLOR);
     LCD.FillRectangle(0, 17,319,17);
     LCD.SetFontColor(FONT_COLOR);
@@ -948,12 +1188,16 @@ void writeStatus(const char status[]) {
  * @pre RPS must be initialized.
  * 
  */
-void showRPSData() {
+void show_RPS_data() {
 
+    // Clears space for movement data and status
+    LCD.SetFontColor(BACKGROUND_COLOR);
+    LCD.FillRectangle(0,100,319,239);
+    LCD.SetFontColor(FONT_COLOR);
     LCD.DrawHorizontalLine(100, 0, 319);
 
     // Writes the data from the RPS
-    writeStatus("Reading RPS Data");
+    write_status("Reading RPS Data");
 
     LCD.WriteRC("Heading: ", 7, 1);
     LCD.WriteRC(RPS.Heading(), 7, 10);
@@ -969,6 +1213,8 @@ void showRPSData() {
 
     LCD.WriteRC("Course: ", 11, 1);
     LCD.WriteRC(RPS.CurrentRegionLetter(), 11, 10);
+
+    Sleep(0.1);
 }
 
 /*******************************************************
@@ -976,13 +1222,13 @@ void showRPSData() {
  * @author Steven Broaddus
  * @param courseNumber Course number to runs
  */
-void runCourse(int courseNumber) {
+void run_course(int courseNumber) {
 
     /*
      * NOTE: Status messages from movement functions only clear the 
      * portion of the screen that they use. They only do this beforehand.
      * 
-     * writeStatus() is used to print what the robot is doing without 
+     * write_status() is used to print what the robot is doing without 
      * clearing the movement status (turn left/right etc..)
      */
 
@@ -992,28 +1238,28 @@ void runCourse(int courseNumber) {
     switch (courseNumber)
     {
     case TEST_COURSE_1: // Test course 1
-        writeStatus("Running Test 1");
+        write_status("Running Test 1");
 
         int xGarb, yGarb;
 
         Sleep(1.0);
         while(true) {
-            writeStatus("Press to turn left.");
+            write_status("Press to turn left.");
             while(!LCD.Touch(&xGarb, &yGarb));
             turn_left_degrees(40, 90);
             while(!LCD.Touch(&xGarb, &yGarb));
             turn_right_degrees(40, 90);
         }
-        writeStatus("Complete.");
+        write_status("Complete.");
         break;
 
     case TEST_COURSE_2: // Test course 1
-        writeStatus("Running Test 2");
+        write_status("Running Test 2");
 
         int xTrash2, yTrash2;
 
         Sleep(1.0);
-        writeStatus("Press to move forward");
+        write_status("Press to move forward");
         
         while(!LCD.Touch(&xTrash2, &yTrash2));
         while(true) {
@@ -1023,7 +1269,7 @@ void runCourse(int courseNumber) {
         break;
 
     case TEST_COURSE_3: // Test course 1
-        writeStatus("Running Test 3");
+        write_status("Running Test 3");
 
         float degreesToTurnBase, degreesToTurnArm;
         int xTrash, yTrash;
@@ -1083,9 +1329,9 @@ void runCourse(int courseNumber) {
         break;
 
     case CALIBRATE_SERVOS:
-        writeStatus("Calibrating Servos");
+        write_status("Calibrating Servos");
         Sleep(1.0);
-        writeStatus("L -> base | R -> arm");
+        write_status("L -> base | R -> arm");
 
         int xTrash420, yTrash69;
 
@@ -1104,79 +1350,13 @@ void runCourse(int courseNumber) {
 
     case PERF_COURSE_1: // Performance Test 1
 
-        /*****
-         * THIS PSEUDO-CODE NEEDS UPDATING
-         * Algorithm for performance test 1:
-         * All degree measurements are CCW from +x
-         * 
-         * 1. Move forward 7.5 inches
-         * 
-         * 2. Rotate left 45 degrees (until heading is 180 degrees)
-         * 
-         * 3. Move forward 11.9 inches
-         * 
-         * 4. Rotate left 90 degrees (until heading is 270 degrees)
-         * 
-         * 4.5. reverse so that wheel axis is over CdS cell
-         * 
-         * 5. Read light
-         * 
-         * 6. Respond to light value (display it too)
-         * 
-         * Following is in a function: 
-         * if (color == red (on right path)) {
-         *      Rotate 35 degrees right (heading == 235 degrees)
-         *      Move forward 2.75 inches
-         *      Rotate 35 degrees left (heading == 270 degrees)
-         *      Move forward until button is pressed (1 second)
-         *      Reverse that much distance
-         *      Rotate 35 right 
-         *      Reverse 2.75 inches
-         *      Rotate 35 left 
-         * 
-         * } else if (color == blue (on left path)) {
-         *      Rotate 35 degrees left (heading == 305 degrees)
-         *      Move forward 2.75 inches
-         *      Rotate 35 degrees right (heading == 270 degrees)
-         *      Move forward until button is pressed (1 second)
-         *      Reverse that much distance
-         *      Rotate 35 left 
-         *      Reverse 2.75 inches
-         *      Rotate 35 degrees right
-         * 
-         * 6.5. Turn left 85 degrees
-         * 
-         * 7. Move forward 9 inches to align with ramp
-         * 
-         * 8. Rotate left 90 degrees (heading == 90 degrees)
-         * 
-         * 9. Move forward 11 inches (base of ramp)
-         * 
-         * 10. Move forward 10 inches (across ramp)
-         * 
-         * 11. Move forward 14 inches (from ramp)
-         * 
-         * 12. Reverse that much (35 inches)
-         * 
-         * 13. Rotate 90 degrees right (heading == 0 degrees)
-         * 
-         * 14. Move forward 2.9 inches 
-         * 
-         * 15. Rotate 45 degrees right (heading == 315 degrees)
-         * 
-         * 16. Move forward until button is pressed (7.5 inches?)
-         * 
-         * 17. Win.
-         * 
-         */ 
-
-        writeStatus("Running Perf. Test 1");
+        write_status("Running Perf. Test 1");
 
         Sleep(1.0);
         
         /***************************************************/
 
-        writeStatus("Moving towards jukebox");
+        write_status("Moving towards jukebox");
 
         // Heads from button to center
         move_forward_inches(20, 8.0 + DIST_AXIS_CDS); // Direct: 7.5 inches 
@@ -1197,17 +1377,17 @@ void runCourse(int courseNumber) {
     
        /***************************************************/
 
-        writeStatus("Pressing jukebox buttons");
+        write_status("Pressing jukebox buttons");
         
         // Presses jukebox buttons
-        pressJukeboxButtons();
+        press_jukebox_buttons();
         
         /***************************************************/
 
         // Moves forward to move wheel axis over jukebox light
         move_forward_inches(20, DIST_AXIS_CDS);
 
-        writeStatus("Moving towards ramp");
+        write_status("Moving towards ramp");
 
         // Moves to center (aligns with ramp)
         turn_left_degrees(20, 85);
@@ -1217,19 +1397,19 @@ void runCourse(int courseNumber) {
         turn_left_degrees(20, 90);
         Sleep(1.0);
         
-        writeStatus("Moving up ramp");
+        write_status("Moving up ramp");
 
         // Moves up ramp
         move_forward_inches(35, 35); // 11 + 10 + 14
         Sleep(1.0);
 
-        writeStatus("Moving down ramp");
+        write_status("Moving down ramp");
         
         // Moves down ramp
         move_forward_inches(-35, 35);
         Sleep(1.0);
 
-        writeStatus("Towards final button");
+        write_status("Towards final button");
 
         // Heads toward final button
         turn_right_degrees(20, 90);
@@ -1241,71 +1421,31 @@ void runCourse(int courseNumber) {
         move_forward_inches(20, 7.5);
         Sleep(1.0);
 
-        writeStatus("Woo?");
+        write_status("Woo?");
         
         break;
         
 
     case PERF_COURSE_2: // Performance Test 2
 
-        /****
-         * 
-         * Algorithm for Performance Test 2 
-         * 
-         * 1. Move forward 11.55 inches + DIST_AXIS_CDS (Aligns with ramp)
-         * 
-         * 2. Turn right 45 degrees (Straight at ramp)
-         * 
-         * 3. Move forward 8.1 inches (Base of ramp)
-         * 
-         * 4. Move forward 10.3 inches (Top of ramp)
-         * 
-         * 5. Move forward 13.35 inches + DIST_ACIS_CDS 
-         * 
-         * 6. Turn right 90 degrees (To reverse towards sink)
-         * 
-         * 7. Reverse 10.5 inches 
-         * 
-         * 8. Turn left 90 degrees (To reverse towards sink)
-         * 
-         * 9. Reverse 7 inches (To sink)
-         * 
-         * 10. Drop tray
-         * 
-         * 11. More forward 7 inches (From sink)
-         * 
-         * 12. Turn left 90 degrees (To reverse towards ticket) 
-         * 
-         * 13. Reverse 10.5 inches
-         * 
-         * 14. Reverse 12.15 inches (Towards ticket)
-         * 
-         * 15. Turn left 90 degrees (front towards ticket)
-         * 
-         * 16. Move forard 8.1 inches (Front of ticket)
-         * 
-         * 17. Slide ticket
-         * 
-         */
-
         LCD.Write("Running Performance Test 2");
 
         Sleep(1.0);
 
-        writeStatus("Aligning with ramp");
+        write_status("Aligning with ramp");
         move_forward_inches(20, 11.55 + DIST_AXIS_CDS);
         turn_right_degrees(20, 45);
 
-        writeStatus("Moving up ramp");
+        write_status("Moving up ramp");
         move_forward_inches(40, 31.75 + DIST_AXIS_CDS);
 
-        writeStatus("Moving towards sink");
+        write_status("Moving towards sink");
         turn_right_degrees(20, 90);
         move_forward_inches(-20, 10.5); // Reverses
         turn_left_degrees(20, 90);
         move_forward_inches(-20, 8);
     
-        writeStatus("Dropping tray");
+        write_status("Dropping tray");
 
         base_servo.SetDegree(85.);
         Sleep(1.0);
@@ -1313,17 +1453,17 @@ void runCourse(int courseNumber) {
         Sleep(2.5);
         base_servo.SetDegree(85.);
 
-        writeStatus("Moving away from sink");
+        write_status("Moving away from sink");
         move_forward_inches(20, 8);
         turn_right_degrees(20, 90);
         move_forward_inches(20, 10.5);
         turn_left_degrees(20, 185);
 
-        writeStatus("Moving towards ticket");
+        write_status("Moving towards ticket");
         move_forward_inches(-20, 13.15);
         turn_left_degrees(20, 90);
 
-        writeStatus("Sliding ticket");
+        write_status("Sliding ticket");
         on_arm_servo.SetDegree(45);
         Sleep(1.0);
         base_servo.SetDegree(0);
@@ -1341,106 +1481,48 @@ void runCourse(int courseNumber) {
 
     case PERF_COURSE_3: // Performance Test 3
 
-        /****
-         * 
-         * Algorithm for Performance Test 3
-         * 
-         * 1. Move forward 11.55 inches + DIST_AXIS_CDS (Aligns with ramp)
-         * 
-         * 2. Turn right 45 degrees (Straight at ramp)
-         * 
-         * 3. Move forward 8.1 inches (Base of ramp)
-         * 
-         * 4. Move forward 10.3 inches (Top of ramp)
-         * 
-         * 5. Move forward 16.86 inches + DIST_AXIS_CDS (In front of center ice cream lever)
-         * 
-         * 6. Turn right 90 degrees (move towards hot plate)
-         * 
-         * 7. Move forward 6.6 inches 
-         * 
-         * 8. Turn left 90 degrees (face towards hot plate)
-         * 
-         * // From wheel axis to tip of upper arm -> 13 inches
-         * 9. Lower base servo and move upper arm into place
-         *    
-         * 10. LIFT HOT PLATE
-         *     Move forward while lifting base arm (upper arm is lifting hot plate)
-         *     Turn arm servo right to finish flip
-         *     Return arm servo to straight position
-         *     
-         *    
-         * 11. Lift base arm after lifting hot plate
-         * 
-         * 12. Turn left 90 degrees (moving towards other side of hot plate)
-         * 
-         * 13. Reverse 6.3 inches (in front of other side of hot plate)
-         * 
-         * 14. Turn right 90 degrees (facing towards other side of hot plate)
-         * 
-         * 15. RETURN HOT PLATE
-         *     lower base servo (~60 degrees)
-         *     extend arm servo to front position (90 degrees)
-         *     turn arm servo left to flip back (0 degrees)
-         *     turn arm servo back to side (180 degrees)
-         *     lift base servo (85 degrees)
-         *  
-         * 16. Turn left 90 degrees (Moving towards ice cream lever)
-         * 
-         * 17. Move forward 12.9 inches + DIST_AXIS_CDS (Moving towards ice cream lever)
-         *     
-         * 18. Turn right 45 degrees (facing towards ice cream lever)
-         * 
-         * 19. Raise base servo (85 degrees)
-         * 
-         * 20. Move forward 3 inches (lower arm over ice cream lever)
-         * 
-         * 21. Lower base arm  (~60 degrees)
-         * 
-         * 22. Sleep 7 seconds
-         * 
-         * 23. Reverse 3 inches
-         * 
-         * 24. Lower base arm (0 degrees) 
-         * 
-         * 25. Move forward 3 inches
-         * 
-         * 26. Raise base arm (~60 degrees) Flip lever back up
-         * 
-         * 27. Reverse 3 inches
-         * 
-         * 28. Win.
-         */ 
-
         LCD.Write("Running Performance Test 3");
         Sleep(1.0);
 
-        writeStatus("Aligning with ramp");
+        RPS_correct_heading(135);
+
+        write_status("Aligning with ramp");
         move_forward_inches(20, 11.55 + DIST_AXIS_CDS);
         turn_right_degrees(20, 45);
+        RPS_correct_heading(90);
 
-        writeStatus("Moving up ramp");
-        move_forward_inches(42, 35.26 + DIST_AXIS_CDS);
-
-        writeStatus("Moving towards hot plate");
+        write_status("Moving up ramp");
+        move_forward_inches(40, 33.26 + DIST_AXIS_CDS); // Initially 35.26
+        RPS_check_y(56.3); // On top of ramp y-coord
+    
+        write_status("Moving towards hot plate");
         turn_right_degrees(20, 90);
-        move_forward_inches(20, 5.5);
-        turn_left_degrees(20, 92);
+        RPS_correct_heading(0);
+        RPS_check_x(18.6); // On top of ramp x-coord
+    
+        move_forward_inches(20, 7.5); // Initially 5.5
+        RPS_check_x(25.95); // In front of burger plate x
+        turn_left_degrees(20, 90);
+        RPS_correct_heading(90);
 
         Sleep(2.0);
 
-        /*
         // Flips burger when robot is ~13 inches in front, facing towards it
-        flipBurger();
-        */
+        flip_burger();
 
-        writeStatus("Moving towards ice cream lever");
+        write_status("Moving towards ice cream lever");
+        move_forward_inches(-20, 3.75);
+        RPS_correct_heading(90);
         turn_left_degrees(20, 90);
-        move_forward_inches(20, 12.9 + DIST_AXIS_CDS);
-        turn_right_degrees(20, 45);
+        RPS_correct_heading(180);
+        move_forward_inches(20, 9.45 + DIST_AXIS_CDS); // Initially 12.9
+        RPS_correct_heading(180);
+        turn_right_degrees(20, 55);
+        RPS_correct_heading(135);
 
-        
-
+        // Flips ice cream lever, about 3 inches in front of it (including base servo arm)
+        flip_ice_cream_lever();
+    
         break;
 
     case PERF_COURSE_4: // Performance Test 4
@@ -1473,25 +1555,39 @@ int main() {
     Sleep(1.0);
 
     // Initializes RPS
-    //RPS.InitializeTouchMenu();
+    RPS.InitializeTouchMenu();
+
+    // Clears the screen
+    LCD.SetBackgroundColor(BACKGROUND_COLOR);
+    LCD.SetFontColor(FONT_COLOR);
+    LCD.Clear();
 
     // Initializes menu and returns chosen course number
-    //int courseNumber = startMenu();
+    // Commented out since QR code stand is too small to easily navigate over Proteus
+    //int courseNumber = start_menu();
 
     //Waits until start light is read
-    //readStartLight();
+    //read_start_light();
     //Sleep(1.0);
 
     // Runs specified course number.
-    //runCourse(courseNumber);
-    //runCourse(PERF_COURSE_3);
-
+    //run_course(courseNumber);
+    run_course(PERF_COURSE_3);
 
     // Test, flips burger when robot is 13 inches in front of hot plate, facing towards it
-    flipBurger();
+    //flip_burger();
 
     // TEST
-    //flipIceCreamLever();
+    //flip_ice_cream_lever();
+
+    /*
+    LCD.SetBackgroundColor(BACKGROUND_COLOR);
+    LCD.SetFontColor(FONT_COLOR);
+    LCD.Clear();
+    while(true){
+        show_RPS_data();
+    }
+    */
 
     return 0;
 }

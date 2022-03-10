@@ -32,7 +32,6 @@
 #define COUNT_PER_INCH (318 / (2 * 3.14159265 * 1.25)) // Number of encoder counts per inch ((ENCODER_COUNTS_PER_REV / (2 * PI * WHEEL_RADIUS))) 
 #define INCH_PER_COUNT ((2 * 3.14159265 * 1.25) / 318) // ^ but opposite
 
-
 // Precise movement calibrations
 #define BACKWARDS_CALIBRATOR 2.15 // Percent difference needed to make backward motors move the same as forward motors at 20% 
 #define RIGHT_MOTOR_CALIBRATOR 1 
@@ -47,12 +46,12 @@
 #define RPS_DELAY_TIME 0.35 // Time that the RPS takes to check again before correcting
 
 #define RPS_TURN_PULSE_PERCENT 20 // Percent at which motors will pulse to correct movement while turning
-#define RPS_TURN_PULSE_TIME 0.1 // Time that the wheels pulse for to correct heading
-#define RPS_TURN_THRESHOLD 1 // Degrees that the heading can differ from before calling it a day
+#define RPS_TURN_PULSE_TIME 0.05 // Time that the wheels pulse for to correct heading
+#define RPS_TURN_THRESHOLD 0.5 // Degrees that the heading can differ from before calling it a day
 
 #define RPS_TRANSLATIONAL_PULSE_PERCENT 20 // Percent at which motors will pulse to correct translational movement
-#define RPS_TRANSLATIONAL_PULSE_TIME 0.25 // Time that the wheels pulse for to correct translational coords
-#define RPS_TRANSLATIONAL_THRESHOLD 1 // Coord units that the robot can be in range of
+#define RPS_TRANSLATIONAL_PULSE_TIME 0.1 // Time that the wheels pulse for to correct translational coords
+#define RPS_TRANSLATIONAL_THRESHOLD 0.25 // Coord units that the robot can be in range of
 
 /************************************************/
 // Course numbers. Used in start_menu() and run_course()
@@ -1067,27 +1066,30 @@ void flip_burger() {
     //***********
     // Initial flip
 
-    // Raises arm
+    // Sets initial arm positions
     base_servo.SetDegree(85);
     on_arm_servo.SetDegree(8);
 
-    Sleep(1.0);
+    Sleep(0.5);
 
     // Lowers base servo and moves it under hot plate
     base_servo.SetDegree(0);
-    move_forward_inches(20, 2);
+    move_forward_inches(20, 2.25);
     
     Sleep(1.0);
 
     // Raises arm and moves forward consecutively
-    base_servo.SetDegree(20);
-    move_forward_inches(20, 2.75);
-    base_servo.SetDegree(50);
-    move_forward_inches(20, 0.75);
-    turn_right_degrees(20, 5);
-    Sleep(1.0);
-    on_arm_servo.SetDegree(180);
-    turn_left_degrees(20, 5);
+    base_servo.SetDegree(20); // First lift
+    move_forward_inches(20, 2);
+    Sleep(0.25);
+
+    base_servo.SetDegree(45); // Second lift
+    move_forward_inches(20, 1.25);
+
+    turn_right_degrees(20, 15); // Turns right to help flip burger
+    Sleep(0.5);
+
+    on_arm_servo.SetDegree(130); // Second arm finishes push
 
     Sleep(2.0);
 
@@ -1095,20 +1097,30 @@ void flip_burger() {
     // Return flip
 
     write_status("Moving towards other side");
+
+    // Resets position
     on_arm_servo.SetDegree(8.); // Resets on arm servo position
-    move_forward_inches(-20, 5.5); // Reverse away from hot plate (3.5 + 2)
+    turn_left_degrees(20, 5); // Readjusts angle
+
+    // Heads towards other side
+    move_forward_inches(-20, 4); // Reverse away from hot plate 
     RPS_correct_heading(90);
+    RPS_check_y(55);
     Sleep(0.5);
-    base_servo.SetDegree(85);
+
+    base_servo.SetDegree(85); // Raise base arm and head towards other side
     turn_left_degrees(20, 90);
     RPS_correct_heading(180);
-    move_forward_inches(-20, 6.3); // Initially 6.3
+    RPS_check_x(23.3);
+    move_forward_inches(-20, 5.8); // 6.3 is measured value
     turn_right_degrees(20, 90);
     RPS_correct_heading(90);
     on_arm_servo.SetDegree(180);
 
     write_status("Returning hot plate");
-    move_forward_inches(20, 3.75); 
+
+    // Flips back hot plate
+    move_forward_inches(20, 5); 
     base_servo.SetDegree(50);
     Sleep(1.0);
     on_arm_servo.SetDegree(15);
@@ -1130,16 +1142,16 @@ void flip_ice_cream_lever() {
 
     write_status("Pushing lever down");
     base_servo.SetDegree(85);
-    move_forward_inches(20, 6);
+    move_forward_inches(20, 8);
     base_servo.SetDegree(60);
     Sleep(7.0);
 
     write_status("Pushing lever up");
-    move_forward_inches(-20, 6);
+    move_forward_inches(-20, 8);
     base_servo.SetDegree(0); 
-    move_forward_inches(20, 6);
-    base_servo.SetDegree(50);
-    move_forward_inches(-20, 6);
+    move_forward_inches(20, 8);
+    base_servo.SetDegree(40);
+    move_forward_inches(-20, 8);
 
     /*
     if (RPS.GetIceCream() == 0) { // VANILLA
@@ -1484,8 +1496,6 @@ void run_course(int courseNumber) {
         LCD.Write("Running Performance Test 3");
         Sleep(1.0);
 
-        RPS_correct_heading(135);
-
         write_status("Aligning with ramp");
         move_forward_inches(20, 11.55 + DIST_AXIS_CDS);
         turn_right_degrees(20, 45);
@@ -1493,17 +1503,19 @@ void run_course(int courseNumber) {
 
         write_status("Moving up ramp");
         move_forward_inches(40, 33.26 + DIST_AXIS_CDS); // Initially 35.26
-        RPS_check_y(56.3); // On top of ramp y-coord
+        RPS_check_y(55); // On top of ramp y-coord
     
         write_status("Moving towards hot plate");
         turn_right_degrees(20, 90);
         RPS_correct_heading(0);
         RPS_check_x(18.6); // On top of ramp x-coord
     
-        move_forward_inches(20, 7.5); // Initially 5.5
-        RPS_check_x(25.95); // In front of burger plate x
+        // PROBLEM AREA. MOVES PRECISELY IN FRONT OF BURGER PLATE
+        move_forward_inches(20, 8); // Initially 5.5
+        RPS_check_x(27.8); // In front of burger plate x
         turn_left_degrees(20, 90);
         RPS_correct_heading(90);
+        RPS_check_y(55);
 
         Sleep(2.0);
 
@@ -1511,13 +1523,17 @@ void run_course(int courseNumber) {
         flip_burger();
 
         write_status("Moving towards ice cream lever");
-        move_forward_inches(-20, 3.75);
+        move_forward_inches(-20, 5);
         RPS_correct_heading(90);
+        RPS_check_y(55);
         turn_left_degrees(20, 90);
         RPS_correct_heading(180);
-        move_forward_inches(20, 9.45 + DIST_AXIS_CDS); // Initially 12.9
+        RPS_check_x(29.1);
+        move_forward_inches(20, 3); // Moves forward a bit to get in better RPS range
         RPS_correct_heading(180);
-        turn_right_degrees(20, 55);
+        move_forward_inches(20, 3.5 + DIST_AXIS_CDS); // Initially 12.9
+        RPS_correct_heading(180);
+        turn_right_degrees(20, 45);
         RPS_correct_heading(135);
 
         // Flips ice cream lever, about 3 inches in front of it (including base servo arm)
@@ -1548,9 +1564,7 @@ void run_course(int courseNumber) {
  */
 int main() {
 
-    float xTrash, yTrash;
-
-    // Initiates servos
+    // Initiates servos 25.3 58.3
     initiateServos();
     Sleep(1.0);
 
@@ -1567,27 +1581,25 @@ int main() {
     //int courseNumber = start_menu();
 
     //Waits until start light is read
-    //read_start_light();
+    read_start_light();
     //Sleep(1.0);
 
     // Runs specified course number.
     //run_course(courseNumber);
     run_course(PERF_COURSE_3);
 
-    // Test, flips burger when robot is 13 inches in front of hot plate, facing towards it
-    //flip_burger();
+    //*****************************************
+    // TEST CODE
 
-    // TEST
-    //flip_ice_cream_lever();
-
-    /*
-    LCD.SetBackgroundColor(BACKGROUND_COLOR);
-    LCD.SetFontColor(FONT_COLOR);
+    //**********************************
+    // Show RPS stuff
     LCD.Clear();
-    while(true){
+    while (true) {
         show_RPS_data();
+        Sleep(0.1);
     }
-    */
+    
+    //*****************************************
 
     return 0;
 }

@@ -43,7 +43,7 @@
 #define ON_ARM_SERVO_MAX 2400
 
 // RPS pulse values
-#define RPS_DELAY_TIME 0.35 // Time that the RPS takes to check again before correcting
+#define RPS_DELAY_TIME 0.5 // Time that the RPS takes to check again before correcting
 
 #define RPS_TURN_PULSE_PERCENT 20 // Percent at which motors will pulse to correct movement while turning
 #define RPS_TURN_PULSE_TIME 0.05 // Time that the wheels pulse for to correct heading
@@ -51,7 +51,7 @@
 
 #define RPS_TRANSLATIONAL_PULSE_PERCENT 20 // Percent at which motors will pulse to correct translational movement
 #define RPS_TRANSLATIONAL_PULSE_TIME 0.1 // Time that the wheels pulse for to correct translational coords
-#define RPS_TRANSLATIONAL_THRESHOLD 0.25 // Coord units that the robot can be in range of
+#define RPS_TRANSLATIONAL_THRESHOLD 0.1 // Coord units that the robot can be in range of
 
 /************************************************/
 // Course numbers. Used in start_menu() and run_course()
@@ -488,7 +488,7 @@ int read_start_light() {
         LCD.WriteRC(CdS_cell.Value(), 7, 20);
 
         // If 
-        if (CdS_cell.Value() < 0.345) {
+        if (CdS_cell.Value() < 0.5) {
             lightOn = 1;
             write_status("GO!");
         }
@@ -542,7 +542,7 @@ void move_forward_inches(int percent, float inches) {
     LCD.WriteRC(right_encoder.Counts(), 12, 20);
 }
 
-/*******************************************************
+/******************************************************* 
  * @brief Moves forward for the specified time at the specified percentage.
  * 
  * @param percent Percent that the motors will drive at
@@ -759,7 +759,7 @@ void RPS_check_x(float x_coord) {
     int direction;
 
     // Makes sure robot can be seen by RPS
-    if (orientation > 0) {
+    if (orientation >= 0) {
 
         write_status("Correcting x with RPS");
         
@@ -779,7 +779,7 @@ void RPS_check_x(float x_coord) {
         }
 
         // Check if receiving proper RPS coordinates and whether the robot is within an acceptable range
-        while((RPS.X() > 0) && (abs(RPS.X() - x_coord) > RPS_TRANSLATIONAL_THRESHOLD))
+        while(((RPS.X() > 0) && (abs(RPS.X() - x_coord) > RPS_TRANSLATIONAL_THRESHOLD)))  //
         {
             if(RPS.X() > x_coord)
             {
@@ -796,7 +796,7 @@ void RPS_check_x(float x_coord) {
             show_RPS_data();
         }
 
-        RPS_correct_heading(orientation);
+        //RPS_correct_heading(orientation);
 
 
     } else {
@@ -822,7 +822,7 @@ void RPS_check_y(float y_coord) {
     int direction;
 
     // Makes sure robot can be seen by RPS
-    if (orientation > 0) {
+    if (orientation >= 0) {
 
         write_status("Correcting y with RPS");
         
@@ -859,7 +859,7 @@ void RPS_check_y(float y_coord) {
             show_RPS_data();
         }
 
-        RPS_correct_heading(orientation);
+        //RPS_correct_heading(orientation);
 
 
     } else {
@@ -1086,7 +1086,7 @@ void flip_burger() {
     base_servo.SetDegree(45); // Second lift
     move_forward_inches(20, 1.25);
 
-    turn_right_degrees(20, 15); // Turns right to help flip burger
+    turn_right_degrees(20, 10); // Turns right to help flip burger
     Sleep(0.5);
 
     on_arm_servo.SetDegree(130); // Second arm finishes push
@@ -1103,7 +1103,7 @@ void flip_burger() {
     turn_left_degrees(20, 5); // Readjusts angle
 
     // Heads towards other side
-    move_forward_inches(-20, 4); // Reverse away from hot plate 
+    move_forward_inches(-20, 4); // Reverse away from hot plate
     RPS_correct_heading(90);
     RPS_check_y(55);
     Sleep(0.5);
@@ -1137,47 +1137,94 @@ void flip_burger() {
  */
 void flip_ice_cream_lever() {
 
-    // Makes sure on arm servo is out of the way
-    on_arm_servo.SetDegree(180);
+    // Distance to move forward towards ice cream lever
+    float distToLever = 4.5; // Initially 6.5
 
-    write_status("Pushing lever down");
-    base_servo.SetDegree(85);
-    move_forward_inches(20, 8);
-    base_servo.SetDegree(60);
-    Sleep(7.0);
+    // Distance between levers
+    float distBtwLevers = 4.0;
 
-    write_status("Pushing lever up");
-    move_forward_inches(-20, 8);
-    base_servo.SetDegree(0); 
-    move_forward_inches(20, 8);
-    base_servo.SetDegree(40);
-    move_forward_inches(-20, 8);
-
-    /*
+    
     if (RPS.GetIceCream() == 0) { // VANILLA
+
+        // Makes sure on arm servo is out of the way
+        on_arm_servo.SetDegree(180);
+
+        write_status("Navigating to vanilla lever ");
+        turn_left_degrees(20, 90);
+        move_forward_inches(20, distBtwLevers);
+        turn_right_degrees(20, 90);
+        //RPS_correct_heading(135);
+
+        write_status("Pushing lever down");
+        base_servo.SetDegree(85);
+        move_forward_inches(20, distToLever);
+        base_servo.SetDegree(60);
+        Sleep(7.0);
+
+        write_status("Pushing lever up");
+        move_forward_inches(-20, distToLever);
+        base_servo.SetDegree(0); 
+        move_forward_inches(20, distToLever - 0.5);
+        base_servo.SetDegree(40);
+        move_forward_inches(-20, distToLever - 0.5);
+
+        turn_left_degrees(20, 90);
+        move_forward_inches(-20, distBtwLevers);
+        turn_right_degrees(20, 90);
 
         
 
     } else if (RPS.GetIceCream() == 1) { // TWIST
 
+        // Makes sure on arm servo is out of the way
+        on_arm_servo.SetDegree(180);
+
+        //RPS_correct_heading(135);
+
         write_status("Pushing lever down");
         base_servo.SetDegree(85);
-        move_forward_inches(20, 3);
+        move_forward_inches(20, distToLever);
         base_servo.SetDegree(60);
         Sleep(7.0);
 
         write_status("Pushing lever up");
-        move_forward_inches(-20, 3);
+        move_forward_inches(-20, distToLever);
         base_servo.SetDegree(0); 
-        move_forward_inches(20, 3);
-        base_servo.SetDegree(60);
-        move_forward_inches(-20, 3);
+        move_forward_inches(20, distToLever - 0.5);
+        base_servo.SetDegree(40);
+        move_forward_inches(-20, distToLever - 0.5);
 
     } else if (RPS.GetIceCream() == 2) { // CHOCOLATE
 
+        // Makes sure on arm servo is out of the way
+        on_arm_servo.SetDegree(180);
+
+        write_status("Navigating to chocolate lever ");
+        turn_right_degrees(20, 90);
+        move_forward_inches(20, distBtwLevers);
+        turn_left_degrees(20, 90);
+        //RPS_correct_heading(135);
+
+        write_status("Pushing lever down");
+        base_servo.SetDegree(85);
+        move_forward_inches(20, distToLever);
+        base_servo.SetDegree(60);
+        Sleep(7.0);
+
+        write_status("Pushing lever up");
+        move_forward_inches(-20, distToLever);
+        base_servo.SetDegree(0); 
+        move_forward_inches(20, distToLever - 0.5);
+        base_servo.SetDegree(40);
+        move_forward_inches(-20, distToLever - 0.5);
+
+        turn_right_degrees(20, 90);
+        move_forward_inches(-20, distBtwLevers);
+        turn_left_degrees(20, 90);
+
     } else {
         write_status("ERROR. ICE CREAM LEVER NOT SPECIFIED.");
-    }*/
+    }
 
 }
 
@@ -1235,6 +1282,9 @@ void show_RPS_data() {
  * @param courseNumber Course number to runs
  */
 void run_course(int courseNumber) {
+
+    int normalSpeed = 30;
+    int turnSpeed = 20;
 
     /*
      * NOTE: Status messages from movement functions only clear the 
@@ -1440,7 +1490,7 @@ void run_course(int courseNumber) {
 
     case PERF_COURSE_2: // Performance Test 2
 
-        LCD.Write("Running Performance Test 2");
+        write_status("Running Performance Test 2");
 
         Sleep(1.0);
 
@@ -1493,7 +1543,7 @@ void run_course(int courseNumber) {
 
     case PERF_COURSE_3: // Performance Test 3
 
-        LCD.Write("Running Performance Test 3");
+        write_status("Running Performance Test 3");
         Sleep(1.0);
 
         write_status("Aligning with ramp");
@@ -1542,7 +1592,41 @@ void run_course(int courseNumber) {
         break;
 
     case PERF_COURSE_4: // Performance Test 4
-        LCD.Write("Running Performance Test 4");
+
+        
+        
+        LCD.Write("Running Performance Test 3");
+        // Center of top coords
+        // 18.1 52.5 (Heading 90)
+        // 15.4 49.7 (Heading left)
+        Sleep(1.0);
+
+        write_status("Aligning with ramp");
+        move_forward_inches(normalSpeed, 11.75 + DIST_AXIS_CDS); // Initially 11.55, then 12.05
+        turn_right_degrees(turnSpeed, 45);
+
+        write_status("Moving up ramp");
+        // Subtracts three to avoid dead zone
+        move_forward_inches(40, 30.26 + DIST_AXIS_CDS); // Initially 35.26
+        RPS_check_y(52.25); // On top of ramp y-coord, initially 55
+
+        turn_left_degrees(turnSpeed, 90);
+        RPS_check_x(15.45); // Initially 15.1
+
+        turn_right_degrees(turnSpeed, 90);
+        move_forward_inches(normalSpeed, 4.20); // Initially 3.25
+        turn_left_degrees(turnSpeed, 45);
+
+        //Flips ice cream lever, about 3 inches in front of it (including base servo arm)
+        flip_ice_cream_lever();
+
+        write_status("Moving towards final button");
+        turn_right_degrees(turnSpeed, 45);
+        //RPS_correct_heading(90);
+        move_forward_inches(-30, 34.46 + DIST_AXIS_CDS); // Initially 35.26
+        turn_left_degrees(turnSpeed, 45);
+        move_forward_inches(-normalSpeed, 20);
+
         break;
 
     case IND_COMP: // Individual Competition
@@ -1582,17 +1666,17 @@ int main() {
 
     //Waits until start light is read
     read_start_light();
-    //Sleep(1.0);
+    Sleep(1.0);
 
     // Runs specified course number.
     //run_course(courseNumber);
-    run_course(PERF_COURSE_3);
+    run_course(PERF_COURSE_4);
 
     //*****************************************
     // TEST CODE
 
     //**********************************
-    // Show RPS stuff
+    //Show RPS stuff
     LCD.Clear();
     while (true) {
         show_RPS_data();

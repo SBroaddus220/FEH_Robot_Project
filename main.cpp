@@ -1138,10 +1138,10 @@ void flip_burger() {
 void flip_ice_cream_lever() {
 
     // Distance to move forward towards ice cream lever
-    float distToLever = 4.5; // Initially 6.5
+    float distToLever = 4.6; // Initially 6.5
 
     // Distance between levers
-    float distBtwLevers = 4.0;
+    float distBtwLevers = 4; // Initially 4.0
 
     
     if (RPS.GetIceCream() == 0) { // VANILLA
@@ -1155,14 +1155,21 @@ void flip_ice_cream_lever() {
         turn_right_degrees(20, 90);
         //RPS_correct_heading(135);
 
+        // Moves on_arm_servo up
+        on_arm_servo.SetDegree(90);
+
         write_status("Pushing lever down");
         base_servo.SetDegree(85);
         move_forward_inches(20, distToLever);
-        base_servo.SetDegree(60);
+        base_servo.SetDegree(55);
         Sleep(7.0);
 
         write_status("Pushing lever up");
         move_forward_inches(-20, distToLever);
+
+        // Makes sure on arm servo is out of the way
+        on_arm_servo.SetDegree(180);
+
         base_servo.SetDegree(0); 
         move_forward_inches(20, distToLever - 0.5);
         base_servo.SetDegree(40);
@@ -1184,7 +1191,7 @@ void flip_ice_cream_lever() {
         write_status("Pushing lever down");
         base_servo.SetDegree(85);
         move_forward_inches(20, distToLever);
-        base_servo.SetDegree(60);
+        base_servo.SetDegree(55);
         Sleep(7.0);
 
         write_status("Pushing lever up");
@@ -1205,14 +1212,21 @@ void flip_ice_cream_lever() {
         turn_left_degrees(20, 90);
         //RPS_correct_heading(135);
 
+        // Moves on_arm_servo up
+        on_arm_servo.SetDegree(90);
+
         write_status("Pushing lever down");
         base_servo.SetDegree(85);
         move_forward_inches(20, distToLever);
-        base_servo.SetDegree(60);
+        base_servo.SetDegree(55);
         Sleep(7.0);
 
         write_status("Pushing lever up");
         move_forward_inches(-20, distToLever);
+
+        // Makes sure on arm servo is out of the way
+        on_arm_servo.SetDegree(180);
+
         base_servo.SetDegree(0); 
         move_forward_inches(20, distToLever - 0.5);
         base_servo.SetDegree(40);
@@ -1622,15 +1636,16 @@ void run_course(int courseNumber) {
 
         write_status("Moving towards final button");
         turn_right_degrees(turnSpeed, 45);
-        //RPS_correct_heading(90);
-        move_forward_inches(-30, 34.46 + DIST_AXIS_CDS); // Initially 35.26
+        move_forward_inches(-20, 3);
+        RPS_correct_heading(90);
+        move_forward_inches(-20, 31.46 + DIST_AXIS_CDS); // Initially 35.26
         turn_left_degrees(turnSpeed, 45);
         move_forward_inches(-normalSpeed, 20);
 
         break;
 
     case IND_COMP: // Individual Competition
-        LCD.Write("Running Ind. Competition");
+        //
         break;
 
     case FINAL_COMP: // Final Competition

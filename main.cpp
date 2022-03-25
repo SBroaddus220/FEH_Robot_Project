@@ -28,12 +28,12 @@
 #define BUTTON_TIME_TO_SLEEP 0.20 // Time to sleep (seconds) after button pressed for accessibility.
 
 // Movement/Dimension calculations
-#define DIST_AXIS_CDS (5.375 - 1.25) // Distance from the center of the wheel axis to the CdS cell.
+#define DIST_AXIS_CDS 4.125 // Distance from the center of the wheel axis to the CdS cell. (5.375 - 1.25)
 #define COUNT_PER_INCH (318 / (2 * 3.14159265 * 1.25)) // Number of encoder counts per inch ((ENCODER_COUNTS_PER_REV / (2 * PI * WHEEL_RADIUS))) 
 #define INCH_PER_COUNT ((2 * 3.14159265 * 1.25) / 318) // ^ but opposite
 
 // Precise movement calibrations
-#define BACKWARDS_CALIBRATOR 2.15 // Percent difference needed to make backward motors move the same as forward motors at 20% 
+#define BACKWARDS_CALIBRATOR 2.4 // Percent difference needed to make backward motors move the same as forward motors at 20%. Initially 2.15
 #define RIGHT_MOTOR_CALIBRATOR 1 
 
 // Servo min/max values
@@ -48,7 +48,7 @@
 #define RAMP_SPEED 40
 
 // RPS pulse values
-#define RPS_DELAY_TIME 0.5 // Time that the RPS takes to check again before correcting
+#define RPS_DELAY_TIME 0.35 // Time that the RPS takes to check again before correcting
 
 #define RPS_TURN_PULSE_PERCENT 20 // Percent at which motors will pulse to correct movement while turning
 #define RPS_TURN_PULSE_TIME 0.05 // Time that the wheels pulse for to correct heading
@@ -554,6 +554,10 @@ void move_forward_inches(int percent, float inches) {
  * @param seconds Time that the motors will drive for
  */
 void move_forward_seconds(float percent, float seconds) {
+
+    if (percent < 0) {
+        percent -= BACKWARDS_CALIBRATOR;
+    }
     
     // Set both motors to passed percentage
     right_motor.SetPercent(percent);
@@ -988,6 +992,9 @@ void press_jukebox_buttons() {
      */ 
     int color = detect_color(4);
 
+    // Time to move forward to press buttons
+    float secondsFromButtons = 0.5;
+
     // Responds to the jukebox light appropriately
     if (color == 0) { // On right path (red light)
 
@@ -996,9 +1003,9 @@ void press_jukebox_buttons() {
         move_forward_inches(FORWARD_SPEED, 2.75);
         turn_left_degrees(TURN_SPEED, 35);
 
-        move_forward_seconds(FORWARD_SPEED, 1.0); // Moves forward until buttons
+        move_forward_seconds(FORWARD_SPEED, secondsFromButtons); // Moves forward until buttons
 
-        move_forward_seconds(-FORWARD_SPEED, 1.0); // Reverses from buttons
+        move_forward_seconds(-FORWARD_SPEED, secondsFromButtons); // Reverses from buttons
 
         // Returns to CdS cell over light
         turn_right_degrees(TURN_SPEED, 35);
@@ -1013,9 +1020,9 @@ void press_jukebox_buttons() {
         move_forward_inches(FORWARD_SPEED, 2.75);
         turn_right_degrees(TURN_SPEED, 35);
 
-        move_forward_seconds(FORWARD_SPEED, 1.0); // Moves forward until buttons
+        move_forward_seconds(FORWARD_SPEED, secondsFromButtons); // Moves forward until buttons
 
-        move_forward_seconds(-FORWARD_SPEED, 1.0); // Reverses from buttons
+        move_forward_seconds(-FORWARD_SPEED, secondsFromButtons); // Reverses from buttons
 
         // Returns to CdS cell over light
         turn_left_degrees(TURN_SPEED, 35);
@@ -1047,6 +1054,7 @@ void flip_burger() {
 
     // Lowers base servo and moves it under hot plate
     base_servo.SetDegree(0);
+    Sleep(0.5);
     move_forward_inches(FORWARD_SPEED, 2.25);
     
     Sleep(0.5);
@@ -1064,7 +1072,7 @@ void flip_burger() {
 
     on_arm_servo.SetDegree(130); // Second arm finishes push
 
-    Sleep(0.5);
+    Sleep(1.5);
 
     //***********
     // Return flip
@@ -1076,7 +1084,7 @@ void flip_burger() {
     turn_left_degrees(TURN_SPEED, 10); // Readjusts angle
 
     // Heads towards other side
-    move_forward_inches(-FORWARD_SPEED, 4); // Reverse away from hot plate
+    move_forward_inches(-FORWARD_SPEED, 5.5); // Reverse away from hot plate
     RPS_correct_heading(90);
     RPS_check_y(55);
     Sleep(0.5);
@@ -1086,7 +1094,7 @@ void flip_burger() {
     RPS_check_x(23.3);
 
     // Reverses to head towards other side
-    move_forward_inches(-FORWARD_SPEED, 5.8); // 6.3 is measured value
+    move_forward_inches(-FORWARD_SPEED, 5.5); // 6.3 is measured value
     turn_right_degrees(TURN_SPEED, 90);
     on_arm_servo.SetDegree(180);
 
@@ -1097,7 +1105,7 @@ void flip_burger() {
     base_servo.SetDegree(50);
     Sleep(0.25);
     on_arm_servo.SetDegree(15);
-    Sleep(0.25);
+    Sleep(1.0);
 
     // Resets arm positions
     on_arm_servo.SetDegree(180);
@@ -1272,6 +1280,9 @@ void show_RPS_data() {
  */
 void run_course(int courseNumber) {
 
+    // Used for timeouts for some functions
+    float startTime = TimeNow();
+
     /*
      * NOTE: Status messages from movement functions only clear the 
      * portion of the screen that they use. They only do this beforehand.
@@ -1294,9 +1305,9 @@ void run_course(int courseNumber) {
         while(true) {
             write_status("Press to turn left.");
             while(!LCD.Touch(&xGarb, &yGarb));
-            turn_left_degrees(40, 90);
+            turn_left_degrees(TURN_SPEED, 90);
             while(!LCD.Touch(&xGarb, &yGarb));
-            turn_right_degrees(40, 90);
+            turn_right_degrees(TURN_SPEED, 90);
         }
         write_status("Complete.");
         break;
@@ -1628,6 +1639,9 @@ void run_course(int courseNumber) {
             // Moves towards jukebox
             turn_left_degrees(TURN_SPEED, 45);
 
+            // Moves on_arm_servo out of the way
+            on_arm_servo.SetDegree(90); 
+
             // Over CdS cell
             move_forward_inches(FORWARD_SPEED, 12);
 
@@ -1642,6 +1656,9 @@ void run_course(int courseNumber) {
             
             // Presses jukebox buttons, returning to CdS cell over jukebox light
             press_jukebox_buttons();
+
+            // Sets on_arm_servo into initial position
+            on_arm_servo.SetDegree(180);
             
             //************
 
@@ -1662,6 +1679,9 @@ void run_course(int courseNumber) {
             // OR 11.75 + DIST_AXIS_CDS from starting light
             write_status("Moving up ramp");
 
+            // Checks that it is positioned straight
+            RPS_correct_heading(90);
+
             // Subtracts three to avoid dead zone
             // Gets to that place on top of the ramp (52.25, 15.45)
             move_forward_inches(RAMP_SPEED, 30.26 + DIST_AXIS_CDS); // Initially 35.26
@@ -1678,14 +1698,15 @@ void run_course(int courseNumber) {
 
             // Turns around to be able to back up towards sink
             turn_right_degrees(TURN_SPEED, 180);
+            RPS_correct_heading(0);
 
             // Reverses towards sink
-            move_forward_inches(-FORWARD_SPEED, 10.5); 
+            move_forward_inches(-FORWARD_SPEED, 9.8); 
 
-            // Aligns and backs up to edge of sink
+            // Aligns and backs up to edge of sink (~8 inches away)
             turn_left_degrees(TURN_SPEED, 90);
-            move_forward_seconds(-FORWARD_SPEED, 2);
-        
+            move_forward_seconds(-FORWARD_SPEED, 1.5);
+            
             write_status("Dropping tray");
 
             // Moves servos to drop tray
@@ -1697,13 +1718,13 @@ void run_course(int courseNumber) {
             write_status("Moving away from sink");
 
             // Drives away from sink
-            move_forward_seconds(FORWARD_SPEED, 2);
+            move_forward_inches(FORWARD_SPEED, 7.75);
 
             // Moves towards that one spot on top (facing rightwards)
             turn_right_degrees(TURN_SPEED, 90);
-            move_forward_inches(FORWARD_SPEED, 10.5);
+            RPS_correct_heading(0);
+            move_forward_inches(FORWARD_SPEED, 9.8);
 
-            
         
         /*********************************************************************/
         // Ticket
@@ -1713,9 +1734,10 @@ void run_course(int courseNumber) {
 
             // Turns to face left (to be able to reverse towards ticket)
             turn_left_degrees(TURN_SPEED, 180);
+            RPS_check_x(15.45);
 
             // Reverses towards ticket
-            move_forward_inches(-FORWARD_SPEED, 13.15);
+            move_forward_inches(-FORWARD_SPEED, 13.65);
 
             // Facing ticket
             turn_left_degrees(TURN_SPEED, 90);
@@ -1723,33 +1745,38 @@ void run_course(int courseNumber) {
             // Slides ticket
             write_status("Sliding ticket");
             on_arm_servo.SetDegree(45);
-            Sleep(0.5);
             base_servo.SetDegree(0);
-
-            move_forward_inches(FORWARD_SPEED, 5.7); // Inserts arm into ticket slot
+            RPS_correct_heading(270);
+        
+            move_forward_inches(FORWARD_SPEED, 4.0); // Inserts arm into ticket slot
 
             // Reverses away from sink
             on_arm_servo.SetDegree(180);
-            Sleep(0.5);
-            move_forward_inches(-FORWARD_SPEED, 5.7);
+            Sleep(1.0);
+            move_forward_inches(-FORWARD_SPEED, 4.0);
 
         /*********************************************************************/
         // Hot Plate
 
             // From in front of ticket
             write_status("Moving towards hot plate");
+            
+            // Resets arm positions
+            on_arm_servo.SetDegree(8);
+            base_servo.SetDegree(85);
 
             // Moves towards the front
             turn_right_degrees(TURN_SPEED, 90);
-            move_forward_inches(FORWARD_SPEED, 6.5);
+            move_forward_inches(FORWARD_SPEED, 5.65); // Initially 6.5
             turn_right_degrees(TURN_SPEED, 90);
 
             // Currently at y=52.25, needs to be at y=55
             move_forward_inches(FORWARD_SPEED, 2.75);
+            RPS_correct_heading(90);
 
             /* 
              * Flips burger when y=55 and facing towards it
-             * Finishes at y=55 in front of reverse plate (5.8 inches right from front)
+             * Finishes at y=55 in front of reverse plate (5.5 inches right from front)
              */
             flip_burger();
 
@@ -1766,9 +1793,10 @@ void run_course(int courseNumber) {
             turn_left_degrees(TURN_SPEED, 90);
             RPS_check_x(27.9); // 12.45 inches right from lever spot
             move_forward_inches(FORWARD_SPEED, 12.45); // Moves to x=15.45
+            RPS_check_x(15.45);
 
             // Faces towards levers
-            turn_left_degrees(TURN_SPEED, 45);
+            turn_right_degrees(TURN_SPEED, 45);
 
             /*
              * Flips correct ice cream lever when y=56.45 (VERTICALLY) and x=15.45 (LEFT)
@@ -1830,26 +1858,26 @@ int main() {
 
     // Initializes menu and returns chosen course number
     // Commented out since QR code stand is too small to easily navigate over Proteus
-    //int courseNumber = start_menu();
+    // int courseNumber = start_menu();
 
-    //Waits until start light is read
+    // Waits until start light is read
     read_start_light();
-    Sleep(1.0);
+    // Sleep(1.0);
 
     // Runs specified course number.
-    //run_course(courseNumber);
-    run_course(PERF_COURSE_4);
+    // run_course(courseNumber);
+    run_course(IND_COMP);
 
     //*****************************************
     // TEST CODE
 
     //**********************************
     //Show RPS stuff
-    LCD.Clear();
-    while (true) {
-        show_RPS_data();
-        Sleep(0.1);
-    }
+    // LCD.Clear();
+    // while (true) {
+    //     show_RPS_data();
+    //     Sleep(0.1);
+    // }
     
     //*****************************************
 

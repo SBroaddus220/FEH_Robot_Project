@@ -44,7 +44,7 @@
 
 // Speeds the robot uses
 #define FORWARD_SPEED 40
-#define TURN_SPEED 25
+#define TURN_SPEED 20
 #define RAMP_SPEED 50
 
 // RPS pulse values
@@ -1012,6 +1012,8 @@ void press_jukebox_buttons() {
         base_servo.SetDegree(0);
         Sleep(0.5);
 
+        RPS_correct_heading(270);
+
         move_forward_seconds(20, secondsFromButtons); // Moves forward until buttons
 
         move_forward_seconds(-20, secondsFromButtons); // Reverses from buttons
@@ -1039,6 +1041,8 @@ void press_jukebox_buttons() {
 
         // Moves base servo down to press
         base_servo.SetDegree(0);
+
+        RPS_correct_heading(270);
 
         move_forward_seconds(20, secondsFromButtons); // Moves forward until buttons
 
@@ -1122,7 +1126,7 @@ void flip_burger() {
     base_servo.SetDegree(85);
 
     // Moves backwards to 56.45
-    move_forward_inches(-FORWARD_SPEED, 3.55); // Initially 4.05
+    move_forward_inches(-FORWARD_SPEED, 3.05); // Initially 4.05
 }
 
 /*******************************************************
@@ -1186,7 +1190,9 @@ void flip_ice_cream_lever() {
         base_servo.SetDegree(55);
         Sleep(leverTimeSleep);
 
-        // Reverses from lever
+        // Reverses from lever and gets arms out of the way
+        base_servo.SetDegree(85);
+        on_arm_servo.SetDegree(180);
         move_forward_inches(-FORWARD_SPEED, distToLever);
 
         write_status("Pushing lever up");
@@ -1666,6 +1672,9 @@ void run_course(int courseNumber) {
 
             // Sets on_arm_servo into initial position
             on_arm_servo.SetDegree(180);
+
+            // Moves back forward to axis over jukebox light
+            move_forward_inches(FORWARD_SPEED, DIST_AXIS_CDS);
             
             //************
 
@@ -1688,7 +1697,7 @@ void run_course(int courseNumber) {
 
             // Subtracts three to avoid dead zone
             // Gets to that place on top of the ramp (52.25, 15.45)
-            move_forward_inches(RAMP_SPEED, 30.26); // Initially 30.26 + DIST_AXIS_CDS. Took off because no longer moves forward after jukebox
+            move_forward_inches(RAMP_SPEED, 30.26 + DIST_AXIS_CDS); // Initially 30.26 + DIST_AXIS_CDS. Took off because no longer moves forward after jukebox
             //RPS_check_y(52.25); 
 
             // Checks x (may need to edit)
@@ -1770,7 +1779,7 @@ void run_course(int courseNumber) {
 
             // Moves towards the front
             turn_right_degrees(TURN_SPEED, 90);
-            move_forward_inches(FORWARD_SPEED, 6.75); 
+            move_forward_inches(FORWARD_SPEED, 6.5); 
             turn_right_degrees(TURN_SPEED, 90);
 
             // Currently at y=52.25, needs to be at y=55
@@ -1783,7 +1792,7 @@ void run_course(int courseNumber) {
              */
             flip_burger();
 
-            RPS_check_y(55.45); // Initially 56.45
+            RPS_check_y(55.95); // Initially 56.45
 
             turn_left_degrees(TURN_SPEED, 90);
 
@@ -1799,7 +1808,7 @@ void run_course(int courseNumber) {
             // Needs to be at y=56.45 and x=15.45 (LEFT) (Can't check x though at y=56.45 since DEAD ZONE)
             write_status("Moving towards ice cream");
             
-            move_forward_inches(20, 6.25); // Moves to x=15.45, initially 6.25
+            move_forward_inches(20, 5.75); // Moves to x=15.45, initially 6.25
             //RPS_check_x(15.45); // IN DEADZONE
 
             // Faces towards levers
@@ -1872,7 +1881,6 @@ int main() {
     // Sleep(1.0);
 
     // Runs specified course number.
-    // run_course(courseNumber);
     run_course(IND_COMP);
 
     //*****************************************

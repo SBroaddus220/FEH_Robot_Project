@@ -59,6 +59,19 @@
 #define RPS_TRANSLATIONAL_THRESHOLD 0.1 // Coord units that the robot can be in range of
 
 /************************************************/
+// Global variables for RPS values
+
+// Headings
+float RPS_0_Degrees = 0;
+float RPS_90_Degrees = 90;
+float RPS_180_Degrees = 180;
+float RPS_270_Degrees = 270;
+
+// That one spot on the top level ()
+float RPS_Top_Level_X_Reference = 15.45;
+float RPS_Top_Level_Y_Reference = 52.25;
+
+/************************************************/
 // Course numbers. Used in start_menu() and run_course()
 enum { 
             TEST_COURSE_1 = 1, 
@@ -109,6 +122,77 @@ FEHServo on_arm_servo(FEHServo::Servo7);
 
 // Declaration for CdS cell sensorsad 
 AnalogInputPin CdS_cell(FEHIO::P0_7);
+
+/*******************************************************
+ * @brief Updates RPS values by placing the robot in 90 degrees
+ * 
+ */
+void update_RPS_Heading_values() {
+    
+    int xGarb420, yGarb420;
+
+    //**********************************************// 
+    // Sets heading values 
+    write_status("Set 90 degrees");
+
+    Sleep(1.0);
+    LCD.ClearBuffer();
+    
+    while(!LCD.Touch(&xGarb420, &yGarb420));
+
+    RPS_90_Degrees = RPS.Heading();
+    RPS_180_Degrees = RPS_90_Degrees + 90;
+    RPS_270_Degrees = RPS_90_Degrees + 180;
+
+    RPS_0_Degrees = RPS_90_Degrees - 90;
+
+    if (RPS_0_Degrees < 0) {
+        RPS_0_Degrees + 360;
+    }
+
+    Sleep(1.0);
+    LCD.ClearBuffer();
+
+    //**********************************************// 
+    // Sets x/y values for top level RPS Reference value ()
+    write_status("Set x for RPS Top Reference"); // Facing left (180 degrees) 
+
+    Sleep(1.0);
+    LCD.ClearBuffer();
+    
+    while(!LCD.Touch(&xGarb420, &yGarb420));
+
+    RPS_Top_Level_X_Reference = RPS.X();
+
+    Sleep(1.0);
+    LCD.ClearBuffer();
+
+    write_status("Set y for RPS Top Reference"); // Facing left (180 degrees) 
+
+    Sleep(1.0);
+    LCD.ClearBuffer();
+    
+    while(!LCD.Touch(&xGarb420, &yGarb420));
+
+    RPS_Top_Level_X_Reference = RPS.Y();
+
+    Sleep(1.0);
+    LCD.ClearBuffer();
+
+    //**********************************************// 
+    // DONE
+
+    // Clears the screen
+    LCD.SetBackgroundColor(GREEN);
+    LCD.Clear();
+
+    // Waits until touch
+    while(!LCD.Touch(&xGarb420, &yGarb420));
+
+    // Clears the screen
+    LCD.SetBackgroundColor(BACKGROUND_COLOR);
+    LCD.Clear();
+}
 
 /*******************************************************
  * @brief Prompts the user to confirm their choice.
@@ -1012,7 +1096,7 @@ void press_jukebox_buttons() {
         base_servo.SetDegree(0);
         Sleep(0.5);
 
-        RPS_correct_heading(270);
+        RPS_correct_heading(RPS_270_Degrees);
 
         move_forward_seconds(20, secondsFromButtons); // Moves forward until buttons
 
@@ -1042,7 +1126,7 @@ void press_jukebox_buttons() {
         // Moves base servo down to press
         base_servo.SetDegree(0);
 
-        RPS_correct_heading(270);
+        RPS_correct_heading(RPS_270_Degrees);
 
         move_forward_seconds(20, secondsFromButtons); // Moves forward until buttons
 
@@ -1120,7 +1204,7 @@ void flip_burger() {
     Sleep(0.5);
 
     // Correct heading. y=60.5 in front of first flip
-    RPS_correct_heading(90);
+    RPS_correct_heading(RPS_90_Degrees);
     
     // Moves up base servo
     base_servo.SetDegree(85);
@@ -1335,7 +1419,8 @@ void run_course(int courseNumber) {
         
         while(!LCD.Touch(&xTrash2, &yTrash2));
         while(true) {
-            move_forward_inches(20, 9999);
+            move_forward_inches(FORWARD_SPEED, 9999);
+            while(!LCD.Touch(&xTrash2, &yTrash2));
         }
 
         break;
@@ -1656,13 +1741,13 @@ void run_course(int courseNumber) {
             on_arm_servo.SetDegree(90); 
 
             // Over CdS cell
-            move_forward_inches(FORWARD_SPEED, 12);
+            move_forward_inches(FORWARD_SPEED, 11.5);
 
             // Face jukebox
             turn_left_degrees(TURN_SPEED, 90);
 
             //Reverses to move CdS cell over jukebox light and make room for arm
-            move_forward_inches(-FORWARD_SPEED, DIST_AXIS_CDS + 0.5); // 0.5 wasn't initially there
+            move_forward_inches(-FORWARD_SPEED, DIST_AXIS_CDS + 0.75); // 0.5 wasn't initially there
         
             //************
             write_status("Pressing jukebox buttons");
@@ -1693,7 +1778,7 @@ void run_course(int courseNumber) {
             write_status("Moving up ramp");
 
             // Checks that it is positioned straight
-            RPS_correct_heading(90);
+            RPS_correct_heading(RPS_90_Degrees);
 
             // Subtracts three to avoid dead zone
             // Gets to that place on top of the ramp (52.25, 15.45)
@@ -1735,7 +1820,7 @@ void run_course(int courseNumber) {
 
             // Moves towards that one spot on top (facing rightwards)
             turn_right_degrees(TURN_SPEED, 90);
-            RPS_correct_heading(0); // IN DEADZONE
+            RPS_correct_heading(RPS_0_Degrees); // IN DEADZONE
             move_forward_inches(FORWARD_SPEED, 8);
 
         
@@ -1833,7 +1918,7 @@ void run_course(int courseNumber) {
 
             // Reverses back out of dead zone to check heading
             move_forward_inches(-FORWARD_SPEED, 4.20);
-            RPS_correct_heading(90);
+            RPS_correct_heading(RPS_90_Degrees);
 
             // Moves down ramp
             move_forward_inches(-FORWARD_SPEED, 30.26);
@@ -1871,6 +1956,10 @@ int main() {
     LCD.SetBackgroundColor(BACKGROUND_COLOR);
     LCD.SetFontColor(FONT_COLOR);
     LCD.Clear();
+
+    // Gets RPS heading values to decrease inconsistencies from course to course
+    // Clears screen to a green screen until touch is detected
+    update_RPS_Heading_values();
 
     // Initializes menu and returns chosen course number
     // Commented out since QR code stand is too small to easily navigate over Proteus

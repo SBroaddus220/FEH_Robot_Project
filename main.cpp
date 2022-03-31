@@ -125,16 +125,27 @@ FEHServo on_arm_servo(FEHServo::Servo7);
 AnalogInputPin CdS_cell(FEHIO::P0_7);
 
 /*******************************************************
- * @brief Updates RPS values by placing the robot in 90 degrees
+ * @brief Updates RPS values by placing the robot in 90 degrees and in specific x/y coordinates on top platform (15.45, 52.25)
  * 
+ * @param checking_heading true if checking heading values (90 degrees), false if not
+ * @param checking_x true if checking top x coordinate (15,45), false if not
+ * @param checking_y true if checking top y coordinate (52.25), false if not 
  */
 void update_RPS_Heading_values(bool checking_heading, bool checking_x, bool checking_y) {
     
     int xGarb420, yGarb420;
     float tempHeading, tempX, tempY;
 
+    // Confirmation screens pop up after each check. 
+    // The order is as follows: Red, Green, Blue, Yellow
+
     //**********************************************// 
     // Sets heading values 
+
+    // Sets screen to red
+    LCD.SetBackgroundColor(RED);
+    LCD.Clear();
+
     if (checking_heading) {
         write_status("Set 90 degrees");
 
@@ -159,10 +170,14 @@ void update_RPS_Heading_values(bool checking_heading, bool checking_x, bool chec
         }
     }
     
-    Buzzer.Tone(Buzzer.B4, 500);
+    Buzzer.Tone(Buzzer.B4, 250);
 
     //**********************************************// 
     // Sets x/y values for top level RPS Reference value ()
+    // Sets screen to green
+    LCD.SetBackgroundColor(GREEN);
+    LCD.Clear();
+
     if (checking_x) {
         write_status("Set X for RPS"); // Facing left (180 degrees) 
 
@@ -178,10 +193,11 @@ void update_RPS_Heading_values(bool checking_heading, bool checking_x, bool chec
         }
     }
 
+    // Sets screen to blue
+    LCD.SetBackgroundColor(BLUE);
+    LCD.Clear();
     
-    Buzzer.Tone(Buzzer.B4, 500);
-
-   
+    Buzzer.Tone(Buzzer.B4, 250);
 
     if (checking_y) {
          write_status("Set Y for RPS"); // Facing left (180 degrees) 
@@ -198,7 +214,7 @@ void update_RPS_Heading_values(bool checking_heading, bool checking_x, bool chec
         }
     }
 
-    Buzzer.Tone(Buzzer.B4, 500);
+    Buzzer.Tone(Buzzer.B4, 250);
 
     //**********************************************// 
     // DONE
@@ -208,7 +224,7 @@ void update_RPS_Heading_values(bool checking_heading, bool checking_x, bool chec
         LCD.ClearBuffer();
 
         // Clears the screen
-        LCD.SetBackgroundColor(GREEN);
+        LCD.SetBackgroundColor(YELLOW);
         LCD.Clear();
 
         // Waits until touch
@@ -1104,6 +1120,9 @@ void press_jukebox_buttons() {
     Sleep(0.5);
     move_forward_inches(-FORWARD_SPEED, 2); // Makes room for arm
 
+    // Space for turn is the amount of space to move forward after aligning with buttons
+    float spaceForTurn = 2.25; // Initially 2.75
+
     // Time to move forward to press buttons
     float secondsFromButtons = 0.9;
 
@@ -1116,11 +1135,11 @@ void press_jukebox_buttons() {
         // Goes down red button path
         turn_right_degrees(TURN_SPEED, 35);
         
-        move_forward_inches(FORWARD_SPEED, 2.75);
+        move_forward_inches(FORWARD_SPEED, spaceForTurn);
         turn_left_degrees(TURN_SPEED, 35);
 
         // Moves base servo down to press
-        base_servo.SetDegree(5);
+        base_servo.SetDegree(4);
         Sleep(0.5);
 
         RPS_correct_heading(RPS_270_Degrees);
@@ -1135,7 +1154,7 @@ void press_jukebox_buttons() {
         // Returns to CdS cell over light
         turn_right_degrees(TURN_SPEED, 35);
 
-        move_forward_inches(-FORWARD_SPEED, 2.75);
+        move_forward_inches(-FORWARD_SPEED, spaceForTurn);
         turn_left_degrees(TURN_SPEED, 35);
         
 
@@ -1147,11 +1166,11 @@ void press_jukebox_buttons() {
         // Goes down blue button path
         turn_left_degrees(TURN_SPEED, 35);
 
-        move_forward_inches(FORWARD_SPEED, 2.75);
+        move_forward_inches(FORWARD_SPEED, spaceForTurn);
         turn_right_degrees(TURN_SPEED, 35);
 
         // Moves base servo down to press
-        base_servo.SetDegree(5);
+        base_servo.SetDegree(4);
 
         RPS_correct_heading(RPS_270_Degrees);
 
@@ -1166,7 +1185,7 @@ void press_jukebox_buttons() {
         // Returns to CdS cell over light
         turn_left_degrees(TURN_SPEED, 35);
 
-        move_forward_inches(-FORWARD_SPEED, 2.75);
+        move_forward_inches(-FORWARD_SPEED, spaceForTurn);
         turn_right_degrees(TURN_SPEED, 35);
 
     } else {
@@ -1194,14 +1213,14 @@ void flip_burger() {
 
     // Lowers base servo and moves it under hot plate
     base_servo.SetDegree(0);
-    Sleep(0.5);
-    move_forward_inches(FORWARD_SPEED, 1.75); // Initially 2.25
+    Sleep(1.0);
+    move_forward_inches(FORWARD_SPEED, 0.75); // Initially 2.25
     
     Sleep(0.5);
 
     // Raises arm and moves forward consecutively
     base_servo.SetDegree(20); // First lift
-    Sleep(0.5);
+    Sleep(0.25);
     move_forward_inches(FORWARD_SPEED, 2);
     Sleep(0.25);
 
@@ -1226,7 +1245,7 @@ void flip_burger() {
     turn_left_degrees(TURN_SPEED, 15); // Readjusts angle
 
     // Flips around to hit burger plate
-    on_arm_servo.SetDegree(90);
+    on_arm_servo.SetDegree(50);
     base_servo.SetDegree(55);
     move_forward_inches(-FORWARD_SPEED, 1); // Accounted for in last move forward call here
     turn_left_degrees(40, 360);
@@ -1252,7 +1271,7 @@ void flip_burger() {
 void flip_ice_cream_lever() {
 
     // Distance to move forward towards ice cream lever
-    float distToLever = 4.5; // Initially 3.5
+    float distToLever = 5.25; // Initially 3.5
 
     // Distance between levers
     float distBtwLevers = 4;
@@ -1274,7 +1293,7 @@ void flip_ice_cream_lever() {
         write_status("Pushing lever down");
         base_servo.SetDegree(85);
         move_forward_inches(FORWARD_SPEED, distToLever);
-        base_servo.SetDegree(35);
+        base_servo.SetDegree(40);
         Sleep(leverTimeSleep);
 
         // Reverses from lever
@@ -1287,7 +1306,7 @@ void flip_ice_cream_lever() {
 
         base_servo.SetDegree(0); 
         move_forward_inches(FORWARD_SPEED, distToLever);
-        base_servo.SetDegree(45);
+        base_servo.SetDegree(50);
         move_forward_inches(-FORWARD_SPEED, distToLever);
 
         turn_left_degrees(TURN_SPEED, 90);
@@ -1303,7 +1322,7 @@ void flip_ice_cream_lever() {
         write_status("Pushing lever down");
         base_servo.SetDegree(85);
         move_forward_inches(FORWARD_SPEED, distToLever);
-        base_servo.SetDegree(35);
+        base_servo.SetDegree(40);
         Sleep(leverTimeSleep);
 
         // Reverses from lever and gets arms out of the way
@@ -1314,7 +1333,7 @@ void flip_ice_cream_lever() {
         write_status("Pushing lever up");
         base_servo.SetDegree(0); 
         move_forward_inches(FORWARD_SPEED, distToLever);
-        base_servo.SetDegree(45);
+        base_servo.SetDegree(50);
         move_forward_inches(-FORWARD_SPEED, distToLever);
 
     } else if (RPS.GetIceCream() == 2) { // CHOCOLATE
@@ -1331,7 +1350,7 @@ void flip_ice_cream_lever() {
         write_status("Pushing lever down");
         base_servo.SetDegree(85);
         move_forward_inches(FORWARD_SPEED, distToLever);
-        base_servo.SetDegree(35);
+        base_servo.SetDegree(40);
         Sleep(leverTimeSleep);
 
         // Reverses from lever
@@ -1344,7 +1363,7 @@ void flip_ice_cream_lever() {
 
         base_servo.SetDegree(0); 
         move_forward_inches(FORWARD_SPEED, distToLever);
-        base_servo.SetDegree(45);
+        base_servo.SetDegree(50);
         move_forward_inches(-FORWARD_SPEED, distToLever);
 
         turn_right_degrees(TURN_SPEED, 90);
@@ -1769,7 +1788,7 @@ void run_course(int courseNumber) {
             write_status("Moving towards jukebox");
 
             // Heads from button to center
-            move_forward_inches(FORWARD_SPEED, 7.5 + DIST_AXIS_CDS); // Direct: 7.5 inches 
+            move_forward_inches(FORWARD_SPEED, 9 + DIST_AXIS_CDS); // Direct: 7.5 inches 
 
             // Moves towards jukebox
             turn_left_degrees(TURN_SPEED, 45);
@@ -1778,15 +1797,15 @@ void run_course(int courseNumber) {
             on_arm_servo.SetDegree(90); 
 
             // Over CdS cell
-            move_forward_inches(FORWARD_SPEED, 11.5);
+            move_forward_inches(FORWARD_SPEED, 11.5 - 1.0607);
             RPS_check_x(RPS_Top_Level_X_Reference - 8.8); // 8.8 left of top x reference
 
             // Face jukebox
             turn_left_degrees(TURN_SPEED, 90);
 
             //Reverses to move CdS cell over jukebox light and make room for arm
-            move_forward_inches(-FORWARD_SPEED, DIST_AXIS_CDS + 0.25); // 0.5 wasn't initially there
-            RPS_check_y(RPS_Top_Level_Y_Reference - 33.7); // 35 below top y reference 18.3
+            move_forward_inches(-FORWARD_SPEED, DIST_AXIS_CDS + 0.25 - 1.0607); // 0.5 wasn't initially there
+            RPS_check_y(RPS_Top_Level_Y_Reference - 34); // 35 below top y reference 18.3. Initially 33.7
         
             //************
             write_status("Pressing jukebox buttons");
@@ -1838,7 +1857,7 @@ void run_course(int courseNumber) {
             //RPS_correct_heading(0);
 
             // Reverses towards sink
-            move_forward_inches(-FORWARD_SPEED, 9); 
+            move_forward_inches(-FORWARD_SPEED, 9.25); 
 
             // Aligns and backs up to edge of sink (~8 inches away)
             turn_left_degrees(TURN_SPEED, 90);
@@ -1860,7 +1879,7 @@ void run_course(int courseNumber) {
             // Moves towards that one spot on top (facing rightwards)
             turn_right_degrees(TURN_SPEED, 90);
             RPS_correct_heading(RPS_0_Degrees); // IN DEADZONE
-            move_forward_inches(FORWARD_SPEED, 9);
+            move_forward_inches(FORWARD_SPEED, 9.25);
 
         
         /*********************************************************************/
@@ -1874,22 +1893,23 @@ void run_course(int courseNumber) {
             RPS_check_x(RPS_Top_Level_X_Reference); // 15.45
 
             // Reverses towards ticket
-            move_forward_inches(-FORWARD_SPEED, 13); // Initially 13.65
+            move_forward_inches(-FORWARD_SPEED, 13.25); // Initially 13.65
+            RPS_check_x(RPS_Top_Level_X_Reference + 13.25);
 
             // Facing ticket
             turn_left_degrees(TURN_SPEED, 90);
 
             // Slides ticket from y=52.25
             write_status("Sliding ticket");
-            on_arm_servo.SetDegree(45); // Initially 45
+            on_arm_servo.SetDegree(43); // Initially 45
             base_servo.SetDegree(0);
             RPS_check_y(RPS_Top_Level_Y_Reference - 4.65); // 52.25 - 4.65
         
-            move_forward_inches(20, 4.5); // Inserts arm into ticket slot
+            move_forward_inches(20, 4.75); // Inserts arm into ticket slot, initially 0.25
 
             // Reverses away from ticket
             on_arm_servo.SetDegree(180);
-            move_forward_inches(-20, 4.5);
+            move_forward_inches(-20, 4.75);
 
         /*********************************************************************/
         // Hot Plate
@@ -1903,12 +1923,13 @@ void run_course(int courseNumber) {
 
             // Moves towards the front
             turn_right_degrees(TURN_SPEED, 90);
-            move_forward_inches(FORWARD_SPEED, 5.3); 
+            move_forward_inches(FORWARD_SPEED, 6); // Initially 5.85
+            RPS_check_x(RPS_Top_Level_X_Reference + 7.65); // Initially 7.8
             turn_right_degrees(TURN_SPEED, 90);
 
             // Currently at y=52.25, needs to be at y=55
-            RPS_check_y(RPS_Top_Level_Y_Reference);
             move_forward_inches(FORWARD_SPEED, 2.75); // 2.75 initially
+            RPS_check_y(RPS_Top_Level_Y_Reference + 2.75);
 
             /* 
              * Flips burger when y=55 and facing towards it
@@ -1997,7 +2018,7 @@ int main() {
 
     // Gets RPS heading values to decrease inconsistencies from course to course
     // Clears screen to a green screen until touch is detected
-    update_RPS_Heading_values(false, false, false);
+    update_RPS_Heading_values(true, true, true);
 
     // Initializes menu and returns chosen course number
     // Commented out since QR code stand is too small to easily navigate over Proteus

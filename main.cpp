@@ -1222,10 +1222,9 @@ void flip_burger() {
     base_servo.SetDegree(20); // First lift
     Sleep(0.25);
     move_forward_inches(FORWARD_SPEED, 2);
-    Sleep(0.25);
+    Sleep(1.0);
 
     base_servo.SetDegree(45); // Second lift
-    Sleep(0.5);
     move_forward_inches(FORWARD_SPEED, 1.25);
 
     turn_right_degrees(TURN_SPEED, 15); // Turns right to help flip burger
@@ -1277,7 +1276,7 @@ void flip_ice_cream_lever() {
     float distBtwLevers = 4;
 
     // Time to sleep after pressing levers
-    float leverTimeSleep = 6.0;
+    float leverTimeSleep = 7.0;
     
     if (RPS.GetIceCream() == 0) { // VANILLA
 

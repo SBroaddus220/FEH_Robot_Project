@@ -97,9 +97,9 @@ void move_forward_inches(int percent, float inches); // Moves forward number of 
 void move_forward_seconds(float percent, float seconds); // Moves forward for a number of seconds
 void turn_right_degrees(int percent, float degrees); // Turns right a specified number of degrees
 void turn_left_degrees(int percent, float degrees); // Turns left a specified amount of degrees
-void RPS_correct_heading(float heading); // Corrects the heading of the robot using RPS
-void RPS_check_x(float x_coord); // Corrects the x-coord of the robot using RPS
-void RPS_check_y(float y_coord); // Corrects the y-coord of the robot using RPS
+void RPS_correct_heading(float heading, double timeToCheck); // Corrects the heading of the robot using RPS
+void RPS_check_x(float x_coord, double timeToCheck); // Corrects the x-coord of the robot using RPS
+void RPS_check_y(float y_coord, double timeToCheck); // Corrects the y-coord of the robot using RPS
 int detect_color(int timeToDetect); // Detects the color of the jukebox
 void press_jukebox_buttons(); // Presses the jukebox buttons
 void flip_burger(); // Flips the hot plate and burger
@@ -605,15 +605,17 @@ int start_menu() {
  *         1 -> ON
  *         0 -> OFF
  */
-int read_start_light() {
+int read_start_light(double timeToCheck) {
     LCD.Clear();
+
+    double startTime = TimeNow();
 
     int lightOn = 0;
 
     write_status("Waiting for light");
 
-    // Waits until light is detected
-    while (!lightOn) {
+    // Waits until light is detected, or until time allotted is up (timeout)
+    while ((startTime - TimeNow() < timeToCheck) && !lightOn) {
         // Writes out CdS value to the screen
         LCD.WriteRC("CdS Value: ", 7, 2);
         LCD.WriteRC(CdS_cell.Value(), 7, 20);
@@ -793,7 +795,7 @@ void turn_left_degrees(int percent, float degrees) {
  * 
  * @param headingDegrees Heading to correct to in degrees
  */
-void RPS_correct_heading(float heading) {
+void RPS_correct_heading(float heading, double secondsToCheck) {
     /*
      * Determines the direction to turn to get to the desired heading faster
      * 1 -> CW
@@ -810,13 +812,14 @@ void RPS_correct_heading(float heading) {
     } else {
         difference = abs((heading + 360) - (RPS.Heading() + 360)); 
     }
-    
+
+    double startTime = TimeNow();
     
     // Determine the direction of the motors based on the orientation of the QR code
     int power = RPS_TURN_PULSE_PERCENT;
 
     // Check if receiving proper RPS coordinates and whether the robot is within an acceptable range
-    while((RPS.Heading() >= 0) && (difference > RPS_TURN_THRESHOLD))
+    while(((RPS.Heading() >= 0) && (difference > RPS_TURN_THRESHOLD)) || (TimeNow() - startTime < secondsToCheck))
     {
         // Checks which way to turn to turn the least
         if (RPS.Heading() < heading) {
@@ -882,7 +885,7 @@ void RPS_correct_heading(float heading) {
  * 
  * @param x_coord Desired x-coord of the robot
  */
-void RPS_check_x(float x_coord) {
+void RPS_check_x(float x_coord, double secondsToCheck) {
 
     // Directions the robot needs to be facing to correct x-coord
     enum { EAST, WEST };
@@ -893,28 +896,40 @@ void RPS_check_x(float x_coord) {
     // Direction the robot is corrected to
     int direction;
 
+    // Half of the time given to check is given to correcting orientation, half is given to correcting translational position
+    double halfTimeToCheck = secondsToCheck / 2;
+
+    double startTime = TimeNow();
+
     // Makes sure robot can be seen by RPS
-    if (orientation >= 0) {
-
-        write_status("Correcting x with RPS");
-        
-        // Adjusts robot to be facing east/west based on initial orientation
+    write_status("Correcting x with RPS");
+    
+    // Adjusts robot to be facing east/west based on initial orientation
+    // Takes half time to check orientation. If orientation can't be corrected then don't perform corrections
+    bool orientationRecorded = false; // Checks if time has been taken to check orientation
+    while ((TimeNow() - startTime < halfTimeToCheck) && !orientationRecorded) {
         if ((orientation <= 90) || (orientation >= 270)) {
-            RPS_correct_heading(0);
+            RPS_correct_heading(0, halfTimeToCheck);
             direction = EAST;
-        } else {
-            RPS_correct_heading(180);
+            orientationRecorded = true;
+        } else if ((orientation > 90) && (orientation < 270)) {
+            RPS_correct_heading(180, halfTimeToCheck);
             direction = WEST;
+            orientationRecorded = true;
         }
+    }
 
+    if (orientationRecorded) {
         // Determine the direction of the motors based on the direction the robot is facing
         int power = RPS_TRANSLATIONAL_PULSE_PERCENT;
         if(direction == WEST){
             power = -RPS_TRANSLATIONAL_PULSE_PERCENT;
         }
+        
+        startTime = TimeNow();
 
         // Check if receiving proper RPS coordinates and whether the robot is within an acceptable range
-        while(((RPS.X() > 0) && (abs(RPS.X() - x_coord) > RPS_TRANSLATIONAL_THRESHOLD)))  //
+        while ((RPS.X() > 0) && (abs(RPS.X() - x_coord) > RPS_TRANSLATIONAL_THRESHOLD) || (TimeNow() - startTime < halfTimeToCheck))  
         {
             if(RPS.X() > x_coord)
             {
@@ -926,17 +941,16 @@ void RPS_check_x(float x_coord) {
                 // Pulse the motors for a short duration in the correct direction
                 move_forward_seconds(power, RPS_TRANSLATIONAL_PULSE_TIME);
             }
+
             Sleep(RPS_DELAY_TIME);
 
             show_RPS_data();
         }
-
-        //RPS_correct_heading(orientation);
-
-
-    } else {
+    }
+    else {
         write_status("ERROR. RPS NOT READING.");
     }
+    
 }
 
 /*******************************************************
@@ -945,7 +959,7 @@ void RPS_check_x(float x_coord) {
  * 
  * @param y_coord Desired y-coord of the robot
  */
-void RPS_check_y(float y_coord) {
+void RPS_check_y(float y_coord, double secondsToCheck) {
 
     // Directions the robot needs to be facing to correct y-coord
     enum { NORTH, SOUTH };
@@ -956,28 +970,40 @@ void RPS_check_y(float y_coord) {
     // Direction the robot is corrected to
     int direction;
 
+    // Half of the time given to check is given to correcting orientation, half is given to correcting translational position
+    double halfTimeToCheck = secondsToCheck / 2;
+
+    double startTime = TimeNow();
+
     // Makes sure robot can be seen by RPS
-    if (orientation >= 0) {
+    write_status("Correcting y with RPS");
 
-        write_status("Correcting y with RPS");
-        
-        // Adjusts robot to be facing east/west based on initial orientation
+    // Adjusts robot to be facing east/west based on initial orientation
+    // Takes half time to check orientation. If orientation can't be corrected then don't perform corrections
+    bool orientationRecorded = false;
+    while ((TimeNow() - startTime < halfTimeToCheck) && !orientationRecorded) {
         if ((orientation >= 0) && (orientation <= 180)) {
-            RPS_correct_heading(90);
+            RPS_correct_heading(90, halfTimeToCheck);
             direction = NORTH;
-        } else {
-            RPS_correct_heading(270);
+            orientationRecorded = true;
+        } else if ((orientation > 180) && (orientation < 360)) {
+            RPS_correct_heading(270, halfTimeToCheck);
             direction = SOUTH;
+            orientationRecorded = true;
         }
+    }
 
+    if (orientationRecorded) {
         // Determine the direction of the motors based on the direction the robot is facing
         int power = RPS_TRANSLATIONAL_PULSE_PERCENT;
         if(direction == SOUTH){
             power = -RPS_TRANSLATIONAL_PULSE_PERCENT;
         }
 
+        startTime = TimeNow();
+
         // Check if receiving proper RPS coordinates and whether the robot is within an acceptable range
-        while((RPS.Y() > 0) && (abs(RPS.Y() - y_coord) > RPS_TRANSLATIONAL_THRESHOLD))
+        while(((RPS.Y() > 0) && (abs(RPS.Y() - y_coord) > RPS_TRANSLATIONAL_THRESHOLD)) || (TimeNow() - startTime < halfTimeToCheck)) 
         {
             if(RPS.Y() > y_coord)
             {
@@ -993,11 +1019,8 @@ void RPS_check_y(float y_coord) {
 
             show_RPS_data();
         }
-
-        //RPS_correct_heading(orientation);
-
-
-    } else {
+    }
+    else {
         write_status("ERROR. RPS NOT READING.");
     }
 }
@@ -1142,7 +1165,7 @@ void press_jukebox_buttons() {
         base_servo.SetDegree(4);
         Sleep(0.5);
 
-        RPS_correct_heading(RPS_270_Degrees);
+        RPS_correct_heading(RPS_270_Degrees, 2);
 
         move_forward_seconds(20, secondsFromButtons); // Moves forward until buttons
 
@@ -1172,7 +1195,7 @@ void press_jukebox_buttons() {
         // Moves base servo down to press
         base_servo.SetDegree(4);
 
-        RPS_correct_heading(RPS_270_Degrees);
+        RPS_correct_heading(RPS_270_Degrees, 2);
 
         move_forward_seconds(20, secondsFromButtons); // Moves forward until buttons
 
@@ -1253,7 +1276,7 @@ void flip_burger() {
     Sleep(0.5);
 
     // Correct heading. y=60.5 in front of first flip
-    RPS_correct_heading(RPS_90_Degrees);
+    RPS_correct_heading(RPS_90_Degrees, 2);
     
     // Moves up base servo
     base_servo.SetDegree(85);
@@ -1699,23 +1722,23 @@ void run_course(int courseNumber) {
         write_status("Aligning with ramp");
         move_forward_inches(20, 11.55 + DIST_AXIS_CDS);
         turn_right_degrees(20, 45);
-        RPS_correct_heading(90);
+        RPS_correct_heading(90, 3);
 
         write_status("Moving up ramp");
         move_forward_inches(40, 33.26 + DIST_AXIS_CDS); // Initially 35.26
-        RPS_check_y(55); // On top of ramp y-coord
+        RPS_check_y(55, 3); // On top of ramp y-coord
     
         write_status("Moving towards hot plate");
         turn_right_degrees(20, 90);
-        RPS_correct_heading(0);
-        RPS_check_x(18.6); // On top of ramp x-coord
+        RPS_correct_heading(0, 3);
+        RPS_check_x(18.6, 3); // On top of ramp x-coord
     
         // PROBLEM AREA. MOVES PRECISELY IN FRONT OF BURGER PLATE
         move_forward_inches(20, 8); // Initially 5.5
-        RPS_check_x(27.8); // In front of burger plate x
+        RPS_check_x(27.8, 3); // In front of burger plate x
         turn_left_degrees(20, 90);
-        RPS_correct_heading(90);
-        RPS_check_y(55);
+        RPS_correct_heading(90, 3);
+        RPS_check_y(55, 3);
 
         Sleep(2.0);
 
@@ -1723,17 +1746,17 @@ void run_course(int courseNumber) {
         flip_burger();
 
         write_status("Moving towards ice cream lever");
-        RPS_correct_heading(90);
-        RPS_check_y(55);
+        RPS_correct_heading(90, 3);
+        RPS_check_y(55, 3);
         turn_left_degrees(20, 90);
-        RPS_correct_heading(180);
-        RPS_check_x(29.1);
+        RPS_correct_heading(180, 3);
+        RPS_check_x(29.1, 3);
         move_forward_inches(20, 3); // Moves forward a bit to get in better RPS range
-        RPS_correct_heading(180);
+        RPS_correct_heading(180, 3);
         move_forward_inches(20, 3.5 + DIST_AXIS_CDS); // Initially 12.9
-        RPS_correct_heading(180);
+        RPS_correct_heading(180, 3);
         turn_right_degrees(20, 45);
-        RPS_correct_heading(135);
+        RPS_correct_heading(135, 3);
 
         // Flips ice cream lever, about 3 inches in front of it (including base servo arm)
         flip_ice_cream_lever();
@@ -1755,10 +1778,10 @@ void run_course(int courseNumber) {
         write_status("Moving up ramp");
         // Subtracts three to avoid dead zone
         move_forward_inches(40, 30.26 + DIST_AXIS_CDS); // Initially 35.26
-        RPS_check_y(52.25); // On top of ramp y-coord, initially 55
+        RPS_check_y(52.25, 3); // On top of ramp y-coord, initially 55
 
         turn_left_degrees(TURN_SPEED, 90);
-        RPS_check_x(15.45); // Initially 15.1
+        RPS_check_x(15.45, 3); // Initially 15.1
 
         turn_right_degrees(TURN_SPEED, 90);
         move_forward_inches(FORWARD_SPEED, 4.20); // Initially 3.25
@@ -1770,7 +1793,7 @@ void run_course(int courseNumber) {
         write_status("Moving towards final button");
         turn_right_degrees(TURN_SPEED, 45);
         move_forward_inches(-20, 3);
-        RPS_correct_heading(90);
+        RPS_correct_heading(90, 3);
         move_forward_inches(-20, 31.46 + DIST_AXIS_CDS); // Initially 35.26
         turn_left_degrees(TURN_SPEED, 45);
         move_forward_inches(-FORWARD_SPEED, 20);
@@ -1797,14 +1820,14 @@ void run_course(int courseNumber) {
 
             // Over CdS cell
             move_forward_inches(FORWARD_SPEED, 11.5 - 1.0607);
-            RPS_check_x(RPS_Top_Level_X_Reference - 8.8); // 8.8 left of top x reference
+            RPS_check_x(RPS_Top_Level_X_Reference - 8.8, 2); // 8.8 left of top x reference
 
             // Face jukebox
             turn_left_degrees(TURN_SPEED, 90);
 
             //Reverses to move CdS cell over jukebox light and make room for arm
             move_forward_inches(-FORWARD_SPEED, DIST_AXIS_CDS + 0.25 - 1.0607); // 0.5 wasn't initially there
-            RPS_check_y(RPS_Top_Level_Y_Reference - 34); // 35 below top y reference 18.3. Initially 33.7
+            RPS_check_y(RPS_Top_Level_Y_Reference - 34, 2); // 35 below top y reference 18.3. Initially 33.7
         
             //************
             write_status("Pressing jukebox buttons");
@@ -1835,16 +1858,18 @@ void run_course(int courseNumber) {
             write_status("Moving up ramp");
 
             // Checks that it is positioned straight
-            RPS_correct_heading(RPS_90_Degrees);
+            RPS_correct_heading(RPS_90_Degrees, 2);
 
             // Subtracts three to avoid dead zone
             // Gets to that place on top of the ramp (52.25, 15.45)
             move_forward_inches(RAMP_SPEED, 30.26 + DIST_AXIS_CDS); // Initially 30.26 + DIST_AXIS_CDS. Took off because no longer moves forward after jukebox
-            //RPS_check_y(52.25); 
+
+            // Checks x and y coordinate after going up
+            RPS_check_y(52.25, 2); 
 
             // Checks x (may need to edit)
             //turn_left_degrees(TURN_SPEED, 90);
-            //RPS_check_x(15.45); 
+            RPS_check_x(15.45 - 4.65, 2);
             
 
 
@@ -1853,6 +1878,7 @@ void run_course(int courseNumber) {
 
             // Turns around to be able to back up towards sink
             turn_right_degrees(TURN_SPEED, 90); // Initially 180 degrees to correct for RPS check
+            //RPS_check_x(15.45 + 4.65); 
             //RPS_correct_heading(0);
 
             // Reverses towards sink
@@ -1877,7 +1903,7 @@ void run_course(int courseNumber) {
 
             // Moves towards that one spot on top (facing rightwards)
             turn_right_degrees(TURN_SPEED, 90);
-            RPS_correct_heading(RPS_0_Degrees); // IN DEADZONE
+            RPS_correct_heading(RPS_0_Degrees, 2); // IN DEADZONE
             move_forward_inches(FORWARD_SPEED, 9.25);
 
         
@@ -1889,11 +1915,11 @@ void run_course(int courseNumber) {
 
             // Turns to face left (to be able to reverse towards ticket)
             turn_left_degrees(30, 180);
-            RPS_check_x(RPS_Top_Level_X_Reference); // 15.45
+            RPS_check_x(RPS_Top_Level_X_Reference, 2); // 15.45
 
             // Reverses towards ticket
             move_forward_inches(-FORWARD_SPEED, 13.25); // Initially 13.65
-            RPS_check_x(RPS_Top_Level_X_Reference + 13.25);
+            RPS_check_x(RPS_Top_Level_X_Reference + 13.25, 2);
 
             // Facing ticket
             turn_left_degrees(TURN_SPEED, 90);
@@ -1902,7 +1928,7 @@ void run_course(int courseNumber) {
             write_status("Sliding ticket");
             on_arm_servo.SetDegree(43); // Initially 45
             base_servo.SetDegree(0);
-            RPS_check_y(RPS_Top_Level_Y_Reference - 4.65); // 52.25 - 4.65
+            RPS_check_y(RPS_Top_Level_Y_Reference - 4.65, 2); // 52.25 - 4.65
         
             move_forward_inches(20, 4.75); // Inserts arm into ticket slot, initially 0.25
 
@@ -1923,12 +1949,12 @@ void run_course(int courseNumber) {
             // Moves towards the front
             turn_right_degrees(TURN_SPEED, 90);
             move_forward_inches(FORWARD_SPEED, 6); // Initially 5.85
-            RPS_check_x(RPS_Top_Level_X_Reference + 7.65); // Initially 7.8
+            RPS_check_x(RPS_Top_Level_X_Reference + 7.65, 2); // Initially 7.8
             turn_right_degrees(TURN_SPEED, 90);
 
             // Currently at y=52.25, needs to be at y=55
             move_forward_inches(FORWARD_SPEED, 2.75); // 2.75 initially
-            RPS_check_y(RPS_Top_Level_Y_Reference + 2.75);
+            RPS_check_y(RPS_Top_Level_Y_Reference + 2.75, 2);
 
             /* 
              * Flips burger when y=55 and facing towards it
@@ -1936,12 +1962,12 @@ void run_course(int courseNumber) {
              */
             flip_burger();
 
-            RPS_check_y(RPS_Top_Level_Y_Reference + 4); // Initially 55.95, initially plus 3.7
+            RPS_check_y(RPS_Top_Level_Y_Reference + 4, 2); // Initially 55.95, initially plus 3.7
 
             turn_left_degrees(TURN_SPEED, 90);
 
             // In front of initial plate, 4.05 inches from front, heading=0
-            RPS_check_x(RPS_Top_Level_X_Reference + 7.4); // Initially 21.7
+            RPS_check_x(RPS_Top_Level_X_Reference + 7.4, 2); // Initially 21.7
             
 
 
@@ -1977,7 +2003,7 @@ void run_course(int courseNumber) {
 
             // Reverses back out of dead zone to check heading
             move_forward_inches(-FORWARD_SPEED, 4.20);
-            RPS_correct_heading(RPS_90_Degrees);
+            RPS_correct_heading(RPS_90_Degrees, 2);
 
             // Moves down ramp
             move_forward_inches(-FORWARD_SPEED, 30.26);
@@ -2024,7 +2050,7 @@ int main() {
     // int courseNumber = start_menu();
 
     // Waits until start light is read
-    read_start_light();
+    read_start_light(15);
     // Sleep(1.0);
 
     // Runs specified course number.

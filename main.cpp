@@ -265,7 +265,7 @@ void update_RPS_Heading_values(double timeToCheck, bool checking_heading, bool c
         LCD.ClearBuffer();
 
         // Waits until touch
-        while(!LCD.Touch(&xGarb420, &yGarb420) || (TimeNow() - startTime < timeToCheck));
+        while(!LCD.Touch(&xGarb420, &yGarb420) || (TimeNow() - startTime >= timeToCheck));
     }
 
     // Clears the screen
@@ -1195,7 +1195,7 @@ void press_jukebox_buttons() {
     move_forward_inches(-FORWARD_SPEED, 2); // Makes room for arm
 
     // Space for turn is the amount of space to move forward after aligning with buttons
-    float spaceForTurn = 2.25; // Initially 2.75
+    float spaceForTurn = 2; // Initially 2.75
 
     // Time to move forward to press buttons
     float secondsFromButtons = 0.9;
@@ -1218,7 +1218,7 @@ void press_jukebox_buttons() {
 
         RPS_correct_heading(RPS_270_Degrees, 2);
 
-        move_forward_seconds(20, secondsFromButtons); // Moves forward until buttons
+        move_forward_seconds(20, secondsFromButtons + 0.5); // Moves forward until buttons
 
         move_forward_seconds(-20, secondsFromButtons); // Reverses from buttons
 
@@ -1248,7 +1248,7 @@ void press_jukebox_buttons() {
 
         RPS_correct_heading(RPS_270_Degrees, 2);
 
-        move_forward_seconds(20, secondsFromButtons); // Moves forward until buttons
+        move_forward_seconds(20, secondsFromButtons + 0.5); // Moves forward until buttons
 
         move_forward_seconds(-20, secondsFromButtons); // Reverses from buttons
 
@@ -1288,7 +1288,7 @@ void flip_burger() {
     // Lowers base servo and moves it under hot plate
     base_servo.SetDegree(0);
     Sleep(1.0);
-    move_forward_inches(FORWARD_SPEED, 0.75); // Initially 2.25
+    move_forward_inches(FORWARD_SPEED, 1.35); // Initially 2.25
     
     Sleep(0.5);
 
@@ -1301,10 +1301,10 @@ void flip_burger() {
     base_servo.SetDegree(45); // Second lift
     move_forward_inches(FORWARD_SPEED, 1.25);
 
-    turn_right_degrees(TURN_SPEED, 15); // Turns right to help flip burger
+    turn_right_degrees(TURN_SPEED, 30); // Turns right to help flip burger
     Sleep(0.5);
 
-    on_arm_servo.SetDegree(130); // Second arm finishes push
+    on_arm_servo.SetDegree(145); // Second arm finishes push
 
     Sleep(1.0);
 
@@ -1315,7 +1315,7 @@ void flip_burger() {
 
     // Resets position
     on_arm_servo.SetDegree(8.); // Resets on arm servo position
-    turn_left_degrees(TURN_SPEED, 15); // Readjusts angle
+    turn_left_degrees(TURN_SPEED, 30); // Readjusts angle
 
     // Flips around to hit burger plate
     on_arm_servo.SetDegree(50);
@@ -1344,7 +1344,7 @@ void flip_burger() {
 void flip_ice_cream_lever() {
 
     // Distance to move forward towards ice cream lever
-    float distToLever = 5.25; // Initially 3.5
+    float distToLever = 5.5; // Initially 5.25
 
     // Distance between levers
     float distBtwLevers = 4;
@@ -1380,9 +1380,11 @@ void flip_ice_cream_lever() {
         base_servo.SetDegree(0); 
         move_forward_inches(FORWARD_SPEED, distToLever);
         base_servo.SetDegree(50);
-        move_forward_inches(-FORWARD_SPEED, distToLever - 1);
+        move_forward_inches(-FORWARD_SPEED, distToLever);
 
-        turn_left_degrees(TURN_SPEED, 90);
+        turn_left_degrees(TURN_SPEED, 45);
+        move_forward_inches(FORWARD_SPEED, 1);
+        turn_left_degrees(TURN_SPEED, 45);
         move_forward_inches(-FORWARD_SPEED, distBtwLevers);
         turn_right_degrees(TURN_SPEED, 90);
         
@@ -1407,7 +1409,12 @@ void flip_ice_cream_lever() {
         base_servo.SetDegree(0); 
         move_forward_inches(FORWARD_SPEED, distToLever);
         base_servo.SetDegree(50);
-        move_forward_inches(-FORWARD_SPEED, distToLever - 1);
+        move_forward_inches(-FORWARD_SPEED, distToLever);
+
+        // Moves to align with ramp
+        turn_left_degrees(TURN_SPEED, 45);
+        move_forward_inches(FORWARD_SPEED, 1);
+        turn_right_degrees(TURN_SPEED, 45);
 
     } else if (RPS.GetIceCream() == 2) { // CHOCOLATE
 
@@ -1415,9 +1422,9 @@ void flip_ice_cream_lever() {
         on_arm_servo.SetDegree(90);
 
         write_status("Navigating to chocolate lever ");
-        turn_right_degrees(TURN_SPEED, 90);
-        move_forward_inches(FORWARD_SPEED, distBtwLevers);
         turn_left_degrees(TURN_SPEED, 90);
+        move_forward_inches(-FORWARD_SPEED, distBtwLevers);
+        turn_right_degrees(TURN_SPEED, 90);
         //RPS_correct_heading(135);
 
         write_status("Pushing lever down");
@@ -1437,11 +1444,13 @@ void flip_ice_cream_lever() {
         base_servo.SetDegree(0); 
         move_forward_inches(FORWARD_SPEED, distToLever);
         base_servo.SetDegree(50);
-        move_forward_inches(-FORWARD_SPEED, distToLever - 1);
+        move_forward_inches(-FORWARD_SPEED, distToLever);
 
+        turn_left_degrees(TURN_SPEED, 45);
+        move_forward_inches(FORWARD_SPEED, 1);
+        turn_left_degrees(TURN_SPEED, 45);
+        move_forward_inches(FORWARD_SPEED, distBtwLevers);
         turn_right_degrees(TURN_SPEED, 90);
-        move_forward_inches(-FORWARD_SPEED, distBtwLevers);
-        turn_left_degrees(TURN_SPEED, 90);
 
     } else {
         write_status("ERROR. ICE CREAM LEVER NOT SPECIFIED.");
@@ -2080,14 +2089,14 @@ void run_course(int courseNumber) {
 
             // Over CdS cell
             move_forward_inches(FORWARD_SPEED, 11.5 - 1.0607);
-            RPS_check_x(RPS_Top_Level_X_Reference - 7.8, 2); // Initially 8.8 left of top x reference
+            RPS_check_x(RPS_Top_Level_X_Reference - 8.2, 1); // Initially 8.8 left of top x reference
 
             // Face jukebox
             turn_left_degrees(TURN_SPEED, 90);
 
             //Reverses to move CdS cell over jukebox light and make room for arm
             move_forward_inches(-FORWARD_SPEED, DIST_AXIS_CDS + 0.25 - 1.0607); // 0.5 wasn't initially there
-            RPS_check_y(RPS_Top_Level_Y_Reference - 34, 2); // 35 below top y reference 18.3. Initially 33.7
+            RPS_check_y(RPS_Top_Level_Y_Reference - 34.5, 2); // 35 below top y reference 18.3. Initially 33.7
         
             //************
             write_status("Pressing jukebox buttons");
@@ -2130,7 +2139,7 @@ void run_course(int courseNumber) {
             // Checks x (may need to edit)
             //turn_left_degrees(TURN_SPEED, 90); 
             turn_right_degrees(TURN_SPEED, 90); // Initially 180 degrees to correct for RPS check
-            RPS_check_x(RPS_Top_Level_X_Reference + 4.65, 2);
+            RPS_check_x(RPS_Top_Level_X_Reference + 4.65, 3);
             
 
 
@@ -2138,7 +2147,7 @@ void run_course(int courseNumber) {
         // Sink
 
             // Reverses towards sink
-            move_forward_inches(-FORWARD_SPEED, 9.25); 
+            move_forward_inches(-FORWARD_SPEED, 8.5); 
 
             // Aligns and backs up to edge of sink (~8 inches away)
             turn_left_degrees(TURN_SPEED, 90);
@@ -2160,7 +2169,7 @@ void run_course(int courseNumber) {
             // Moves towards that one spot on top (facing rightwards)
             turn_right_degrees(TURN_SPEED, 90);
             //RPS_correct_heading(RPS_0_Degrees, 2); // IN DEADZONE
-            move_forward_inches(FORWARD_SPEED, 9.25);
+            move_forward_inches(FORWARD_SPEED, 8.5);
 
         
         /*********************************************************************/
@@ -2175,22 +2184,23 @@ void run_course(int courseNumber) {
 
             // Reverses towards ticket
             move_forward_inches(-FORWARD_SPEED, 13.25); // Initially 13.65
-            RPS_check_x(RPS_Top_Level_X_Reference + 13.25, 2);
+            RPS_check_x(RPS_Top_Level_X_Reference + 13, 2);
 
             // Facing ticket
             turn_left_degrees(TURN_SPEED, 90);
 
             // Slides ticket from y=52.25
             write_status("Sliding ticket");
-            on_arm_servo.SetDegree(43); // Initially 45
+            on_arm_servo.SetDegree(45); // Initially 45
             base_servo.SetDegree(0);
             RPS_check_y(RPS_Top_Level_Y_Reference - 4.65, 2); // 52.25 - 4.65
         
-            move_forward_inches(20, 4.75); // Inserts arm into ticket slot, initially 0.25
+            move_forward_inches(20, 5.25); // Inserts arm into ticket slot, initially 0.25
 
             // Reverses away from ticket
             on_arm_servo.SetDegree(180);
-            move_forward_inches(-20, 4.75);
+            Sleep(0.25);
+            move_forward_inches(-20, 5.25);
 
         /*********************************************************************/
         // Hot Plate
@@ -2204,13 +2214,14 @@ void run_course(int courseNumber) {
 
             // Moves towards the front
             turn_right_degrees(TURN_SPEED, 90);
-            move_forward_inches(FORWARD_SPEED, 6); // Initially 5.85
-            RPS_check_x(RPS_Top_Level_X_Reference + 7.65, 2); // Initially 7.8
+            move_forward_inches(FORWARD_SPEED, 6.5); // Initially 6.25
+            RPS_check_x(RPS_Top_Level_X_Reference + 7.05, 2); // Initially 7.15
             turn_right_degrees(TURN_SPEED, 90);
 
             // Currently at y=52.25, needs to be at y=55
+            RPS_correct_heading(90, 3);
             move_forward_inches(FORWARD_SPEED, 2.75); // 2.75 initially
-            RPS_check_y(RPS_Top_Level_Y_Reference + 2.75, 3);
+            RPS_check_y(RPS_Top_Level_Y_Reference + 2.75, 2);
 
             /* 
              * Flips burger when y=55 and facing towards it
@@ -2233,7 +2244,7 @@ void run_course(int courseNumber) {
             // Needs to be at y=56.45 and x=15.45 (LEFT) (Can't check x though at y=56.45 since DEAD ZONE)
             write_status("Moving towards ice cream");
             
-            move_forward_inches(20, 5); // Moves to x=15.45, initially 5.75
+            move_forward_inches(20, 4.5); // Moves to x=15.45, initially 5
             //RPS_check_x(15.45); // IN DEADZONE
 
             // Faces towards levers
@@ -2261,11 +2272,11 @@ void run_course(int courseNumber) {
             RPS_correct_heading(RPS_90_Degrees, 2);
 
             // Moves down ramp
-            move_forward_inches(-FORWARD_SPEED, 30.26);
+            move_forward_inches(-RAMP_SPEED, 30.26);
 
             // Heads towards final button
             turn_left_degrees(TURN_SPEED, 45);
-            move_forward_inches(-FORWARD_SPEED, 20);
+            move_forward_inches(-40, 30);
 
 
         break;

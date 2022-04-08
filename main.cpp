@@ -52,7 +52,7 @@
 #define RPS_DELAY_TIME 0.35 // Time that the RPS takes to check again before correcting
 
 #define RPS_TURN_PULSE_PERCENT 20 // Percent at which motors will pulse to correct movement while turning
-#define RPS_TURN_PULSE_TIME 0.05 // Time that the wheels pulse for to correct heading. Originally 0.05.
+#define RPS_TURN_PULSE_TIME 0.08 // Time that the wheels pulse for to correct heading. Originally 0.05.
 #define RPS_TURN_THRESHOLD 0.5 // Degrees that the heading can differ from before calling it a day
 
 #define RPS_TRANSLATIONAL_PULSE_PERCENT 20 // Percent at which motors will pulse to correct translational movement
@@ -265,7 +265,7 @@ void update_RPS_Heading_values(double timeToCheck, bool checking_heading, bool c
         LCD.ClearBuffer();
 
         // Waits until touch
-        while(!LCD.Touch(&xGarb420, &yGarb420) || (TimeNow() - startTime >= timeToCheck));
+        while(!LCD.Touch(&xGarb420, &yGarb420));
     }
 
     // Clears the screen
@@ -856,7 +856,7 @@ void RPS_correct_heading(float heading, double secondsToCheck) {
     int power = RPS_TURN_PULSE_PERCENT;
 
     // Check if receiving proper RPS coordinates and whether the robot is within an acceptable range
-    while(((RPS.Heading() >= 0) && (difference > RPS_TURN_THRESHOLD)) || (TimeNow() - startTime < secondsToCheck))
+    while(((RPS.Heading() >= 0) && (difference > RPS_TURN_THRESHOLD)) && (TimeNow() - startTime < secondsToCheck))
     {
         // Checks which way to turn to turn the least
         if (RPS.Heading() < heading) {
@@ -970,7 +970,7 @@ void RPS_check_x(float x_coord, double secondsToCheck) {
         startTime = TimeNow();
 
         // Check if receiving proper RPS coordinates and whether the robot is within an acceptable range
-        while ((RPS.X() > 0) && (abs(RPS.X() - x_coord) > RPS_TRANSLATIONAL_THRESHOLD) || (TimeNow() - startTime < halfTimeToCheck))  
+        while ((RPS.X() > 0) && (abs(RPS.X() - x_coord) > RPS_TRANSLATIONAL_THRESHOLD) && (TimeNow() - startTime < halfTimeToCheck))  
         {
             if(RPS.X() > x_coord)
             {
@@ -1049,7 +1049,7 @@ void RPS_check_y(float y_coord, double secondsToCheck) {
         startTime = TimeNow();
 
         // Check if receiving proper RPS coordinates and whether the robot is within an acceptable range
-        while(((RPS.Y() > 0) && (abs(RPS.Y() - y_coord) > RPS_TRANSLATIONAL_THRESHOLD)) || (TimeNow() - startTime < halfTimeToCheck)) 
+        while(((RPS.Y() > 0) && (abs(RPS.Y() - y_coord) > RPS_TRANSLATIONAL_THRESHOLD)) && (TimeNow() - startTime < halfTimeToCheck)) 
         {
             if(RPS.Y() > y_coord)
             {
@@ -2003,12 +2003,12 @@ void run_course(int courseNumber) {
             // Moves towards the front
             turn_right_degrees(TURN_SPEED, 90);
             move_forward_inches(FORWARD_SPEED, 6); // Initially 5.85
-            RPS_check_x(RPS_Top_Level_X_Reference + 7.65, 2); // Initially 7.8
+            RPS_check_x(RPS_Top_Level_X_Reference + 7.65, 4); // Initially 7.8
             turn_right_degrees(TURN_SPEED, 90);
 
             // Currently at y=52.25, needs to be at y=55
             move_forward_inches(FORWARD_SPEED, 2.75); // 2.75 initially
-            RPS_check_y(RPS_Top_Level_Y_Reference + 2.75, 3);
+            RPS_check_y(RPS_Top_Level_Y_Reference + 2.75, 4);
 
             /* 
              * Flips burger when y=55 and facing towards it
@@ -2056,7 +2056,7 @@ void run_course(int courseNumber) {
 
             // Reverses back out of dead zone to check heading
             move_forward_inches(-FORWARD_SPEED, 4.20);
-            RPS_correct_heading(RPS_90_Degrees, 2);
+            RPS_correct_heading(RPS_90_Degrees, 4);
 
             // Moves down ramp
             move_forward_inches(-FORWARD_SPEED, 30.26);
@@ -2183,7 +2183,7 @@ void run_course(int courseNumber) {
             //RPS_check_x(RPS_Top_Level_X_Reference, 2); // 15.45
 
             // Reverses towards ticket
-            move_forward_inches(-FORWARD_SPEED, 13.25); // Initially 13.65
+            move_forward_inches(-FORWARD_SPEED, 13); // Initially 13.65
             RPS_check_x(RPS_Top_Level_X_Reference + 13, 2);
 
             // Facing ticket
@@ -2269,14 +2269,14 @@ void run_course(int courseNumber) {
 
             // Reverses back out of dead zone to check heading
             move_forward_inches(-FORWARD_SPEED, 4.20);
-            RPS_correct_heading(RPS_90_Degrees, 2);
+            RPS_correct_heading(RPS_90_Degrees, 3);
 
             // Moves down ramp
             move_forward_inches(-RAMP_SPEED, 30.26);
 
             // Heads towards final button
             turn_left_degrees(TURN_SPEED, 45);
-            move_forward_inches(-40, 30);
+            move_forward_inches(-50, 30);
 
 
         break;

@@ -5,7 +5,7 @@
 /*      Steven Broaddus, Conolly Burgess     */
 /*        Joseph Richmond, Jake Chang        */
 /*                                           */
-/*            Updated 3/7/2022               */
+/*            Updated 4/13/2022              */
 /*       Uses Doxygen for documentation      */
 /*********************************************/
 
@@ -17,7 +17,6 @@
 #include <FEHMotor.h>
 #include <FEHRPS.h>
 #include <FEHServo.h>
-#include <FEHBuzzer.h>
 #include <cmath> // abs() 
 
 /************************************************/
@@ -26,7 +25,6 @@
 #define PI 3.14159265
 #define BACKGROUND_COLOR WHITE // Background color of layout
 #define FONT_COLOR BLACK // Font color of layout
-#define BUTTON_TIME_TO_SLEEP 0.20 // Time to sleep (seconds) after button pressed for accessibility.
 
 // Movement/Dimension calculations
 #define DIST_AXIS_CDS 4.125 // Distance from the center of the wheel axis to the CdS cell. (5.375 - 1.25)
@@ -73,7 +71,7 @@ float RPS_Top_Level_X_Reference = 15.45;
 float RPS_Top_Level_Y_Reference = 52.25;
 
 // *****************************************
-// Global variables for PID (Will make class later)
+// Global variables for PID
 
 // PID Right Motor
 double PID_Linear_SpeedR, PID_New_CountsR, PID_Last_CountsR, PID_New_TimeR, PID_Last_TimeR, PID_New_Speed_ErrorR, PID_Last_Speed_ErrorR, PID_Error_SumR;
@@ -89,7 +87,7 @@ double PID_Linear_SpeedL, PID_New_CountsL, PID_Last_CountsL, PID_New_TimeL, PID_
 float PID_NEW_MOTOR_POWERL, PID_OLD_MOTOR_POWERL;
 double PTermL, ITermL, DTermL;
 
-double PConstL = 0.75; // 0.75
+double PConstL = 0.75;
 double IConstL = 0.05; 
 double DConstL = 0.25;
 
@@ -115,11 +113,9 @@ enum {
          };
 
 /************************************************/
-// Function Prototypes
-int confirmation(const char prompt[], int xPrompt, int yPrompt); // Prompts the user to confirm a choice
-void draw_main_menu_screen(FEHIcon::Icon test_button, FEHIcon::Icon perf_test_button, FEHIcon::Icon competition_button); // Draws the main menu screen
-int start_menu(); // Sets up a starting menu for the user.
-int read_start_light(); // Waits for the start light
+// Function Prototypes (For reference, these don't actually do anything)
+void update_RPS_Heading_values(double timeToCheck, bool checking_heading, bool checking_x, bool checking_y); // Updates RPS values across the map
+int read_start_light(double timeToCheck); // Waits for the start light with a timeout
 void move_forward_inches(int percent, float inches); // Moves forward number of inches
 void move_forward_seconds(float percent, float seconds); // Moves forward for a number of seconds
 void turn_right_degrees(int percent, float degrees); // Turns right a specified number of degrees
@@ -127,7 +123,12 @@ void turn_left_degrees(int percent, float degrees); // Turns left a specified am
 void RPS_correct_heading(float heading, double timeToCheck); // Corrects the heading of the robot using RPS
 void RPS_check_x(float x_coord, double timeToCheck); // Corrects the x-coord of the robot using RPS
 void RPS_check_y(float y_coord, double timeToCheck); // Corrects the y-coord of the robot using RPS
-int detect_color(int timeToDetect); // Detects the color of the jukebox
+void ResetPIDVariables(); // Resets PID variables
+float RightPIDAdjustment(double expectedSpeed); // Corrects right motor based on speed, counts, and expected speed
+float LeftPIDAdjustment(double expectedSpeed); // Corrects left motor based on speed, counts, and expected speed
+void move_forward_PID(float in_per_sec, float inches); // Uses PID to move forward a specific amount of inches
+void initiateServos(); // Initiates speed
+int detect_color(int timeToDetect); // Detects the color of the jukebox with timeout
 void press_jukebox_buttons(); // Presses the jukebox buttons
 void flip_burger(); // Flips the hot plate and burger
 void flip_ice_cream_lever(); // Flips the correct ice cream lever
@@ -154,6 +155,7 @@ AnalogInputPin CdS_cell(FEHIO::P0_7);
 /*******************************************************
  * @brief Updates RPS values by placing the robot in 90 degrees and in specific x/y coordinates on top platform (15.45, 52.25)
  * 
+ * @param timeToCheck time to check heading/x/y before timing out
  * @param checking_heading true if checking heading values (90 degrees), false if not
  * @param checking_x true if checking top x coordinate (15,45), false if not
  * @param checking_y true if checking top y coordinate (52.25), false if not 
@@ -301,370 +303,9 @@ void update_RPS_Heading_values(double timeToCheck, bool checking_heading, bool c
 }
 
 /*******************************************************
- * @brief Prompts the user to confirm their choice.
- * 
- * @param prompt Prompt for the user to confirm.
- * @param xPrompt X RC (Rows/Columns, see LCD.WriteRC documentation) to write at.
- * @param yPrompt Same as xPrompt, but y RC coord.
- * @return int The value of the user's decision. 
- *          Yes -> 1 (true)
- *          No  -> 0 (false)
- */
-int confirmation(const char prompt[], int xPrompt, int yPrompt) {
-
-    enum { 
-            YES = true, 
-            NO = false
-         };
-
-    // Coords of touch 
-    int xTouch, yTouch;
-
-    // Selection to check buttons
-    int selection;
-
-    // Initiates decision to invalid value
-    int decision = -1;
-
-    // Icons to display choices
-    FEHIcon::Icon confirm[2];
-    char confirm_labels[2][20] = {"Yes", "No"};
-
-    // Sleeps to show "pressed" status of other buttons
-    Sleep(BUTTON_TIME_TO_SLEEP);
-    LCD.ClearBuffer();
-
-    // Draws choices and prompt
-    LCD.Clear();
-
-    // Writes the passed-in prompt at the x, y RC coords
-    LCD.WriteRC(prompt, xPrompt, yPrompt);
-
-    FEHIcon::DrawIconArray(confirm, 1, 2, 100, 50, 50, 50, confirm_labels, FONT_COLOR, FONT_COLOR);
-
-    // Waits a bit to not suddenly allow for a choice
-    Sleep(BUTTON_TIME_TO_SLEEP);
-    LCD.ClearBuffer();
-
-    // While decision hasn't been made, wait for touch
-    while (decision == -1)  
-    {
-        // Waits for touch and loops through buttons to see if they were pressed
-        if (LCD.Touch(&xTouch, &yTouch)) {
-            for (int i = 0; i < 2; i++) {
-                if (confirm[i].Pressed(xTouch, yTouch, 0)) {
-                    selection = i + 1;
-                }
-            }
-        }
-
-        // Checks which button has been pressed
-        switch (selection) {
-            case 1:
-                decision = YES;
-                break;
-            case 2:
-                decision = NO;
-                break;
-        }
-    }
-
-    return decision;
-}
-
-/*******************************************************
- * @brief Draws the main menu screen. In a function for re-use.
- * 
- * @param test_button Button that leads to the test menu
- * @param perf_test_button Button that leads to the performance test menu
- * @param competition_button Button that leads to the competition test menu
- */
-void draw_main_menu_screen(FEHIcon::Icon test_button, FEHIcon::Icon perf_test_button, FEHIcon::Icon competition_button) {
-    
-    // Sleeps to show "pressed" status of other buttons
-    Sleep(BUTTON_TIME_TO_SLEEP);
-    LCD.ClearBuffer();
-
-    LCD.Clear();
-
-    // Prompts the user for selection
-    LCD.WriteRC("What do?", 2, 9);
-
-    // Draws the passed-in icons
-    test_button.Draw(); 
-    perf_test_button.Draw(); 
-    competition_button.Draw(); 
-
-    // Waits a bit to not suddenly allow for a choice
-    Sleep(BUTTON_TIME_TO_SLEEP);
-    LCD.ClearBuffer();
-}
-
-/*******************************************************
- * @brief Initializes the starting menu to choose a course.
- * 
- * @return int Course chosen, see defined course number enum.
- */
-int start_menu() {
-    
-    // Coordinates for touch
-    float xTouch, yTouch; 
-
-    // Enums for menus
-    enum { MAIN_MENU, TEST_MENU, PERFORMANCE_MENU, COMPETITION_MENU };
-
-    // Initializes the screen
-    LCD.SetBackgroundColor(BACKGROUND_COLOR);
-    LCD.SetFontColor(FONT_COLOR);
-    LCD.Clear();
-
-    // Creates main menu icons
-    char mainLabels[4][20] = {"Test", "Perf. Tests", "Competition", "Calibrate Servo"};
-    FEHIcon::Icon test_button, perf_test_button, competition_button;
-    test_button.SetProperties(mainLabels[0], 75, 75, 170, 40, FONT_COLOR, FONT_COLOR);
-    perf_test_button.SetProperties(mainLabels[1], 75, 125, 170, 40, FONT_COLOR, FONT_COLOR); 
-    competition_button.SetProperties(mainLabels[2], 75, 175, 170, 40, FONT_COLOR, FONT_COLOR); 
-
-    // Creates button to calibrate servos
-    FEHIcon::Icon calibrate_servo_button;
-    calibrate_servo_button.SetProperties(mainLabels[3], 50, 75, 220, 40, FONT_COLOR, FONT_COLOR);
-
-    // Assigns the labels for the different Tests
-    FEHIcon::Icon testButtons[3];
-    char test_button_labels[3][20] = {"1", "2", "3"};
-
-    FEHIcon::Icon performanceTests[4];
-    char performance_labels[4][20] = {"1", "2", "3", "4"};
-
-    FEHIcon::Icon competitions[2];
-    char competition_labels[2][20] = {"Ind.", "Final"};
-
-    // Used in while loop to check for decisions
-    int courseChosen = 0;
-    int selection;
-    int confirmed = false;
-
-    // Sets the screen to the default of the MAIN_MENU
-    int screen = MAIN_MENU;
-
-    // Draws the MAIN_MENU
-    draw_main_menu_screen(test_button, perf_test_button, competition_button);
-
-    // Repeats until the user hasn't chosen a course and confirmed it
-    while (!courseChosen && !confirmed) {
-        
-        // Checks buttons on MAIN_MENU
-        while (screen == MAIN_MENU && !courseChosen) {
-
-            if (LCD.Touch(&xTouch, &yTouch)) {
-
-                if (test_button.Pressed(xTouch, yTouch, 0)) 
-                { 
-                    Sleep(BUTTON_TIME_TO_SLEEP);
-                    LCD.Clear();
-                    screen = TEST_MENU;
-                    LCD.WriteRC("Tests!", 2, 10);
-                    FEHIcon::DrawIconArray(testButtons, 1, 3, 150, 50, 50, 50, test_button_labels, FONT_COLOR, FONT_COLOR);
-                    calibrate_servo_button.Draw();
-
-                    // Waits a bit to not suddenly allow for a choice
-                    Sleep(BUTTON_TIME_TO_SLEEP);
-                    LCD.ClearBuffer();
-                } 
-                if (perf_test_button.Pressed(xTouch, yTouch, 0)) 
-                { 
-                    Sleep(BUTTON_TIME_TO_SLEEP);
-                    LCD.Clear();
-                    screen = PERFORMANCE_MENU;
-                    LCD.WriteRC("Performance Tests", 1, 5);
-                    FEHIcon::DrawIconArray(performanceTests, 2, 2, 50, 25, 25, 25, performance_labels, FONT_COLOR, FONT_COLOR);
-
-                    // Waits a bit to not suddenly allow for a choice
-                    Sleep(BUTTON_TIME_TO_SLEEP);
-                    LCD.ClearBuffer();
-                } 
-                if (competition_button.Pressed(xTouch, yTouch, 0)) 
-                { 
-                    Sleep(BUTTON_TIME_TO_SLEEP);
-                    LCD.Clear();
-                    screen = COMPETITION_MENU;
-                    LCD.WriteRC("Competitions", 2, 7);
-                    FEHIcon::DrawIconArray(competitions, 1, 2, 75, 50, 50, 50, competition_labels, FONT_COLOR, FONT_COLOR);
-                    // Waits a bit to not suddenly allow for a choice
-                    Sleep(BUTTON_TIME_TO_SLEEP);
-                    LCD.ClearBuffer();
-                }
-            }
-        } // End MAIN_MENU button check
-
-        // Checks buttons on TEST_MENU
-        while (screen == TEST_MENU && !courseChosen) {
-            
-            // Initializes selection
-            selection = 0;
-            
-            // Loops through test button array upon touch
-            if (LCD.Touch(&xTouch, &yTouch)) {
-                for (int i = 0; i < 3; i++) {
-                    if (testButtons[i].Pressed(xTouch, yTouch, 0)) {
-                        selection = i+1;
-                    }
-                }
-
-                // Checks if calibrate servo button was pressed
-                if (calibrate_servo_button.Pressed(xTouch, yTouch, 0)) {
-                    selection = 4;
-                }
-
-                // Responds to which button was pressed
-                switch (selection) {
-                    case 1:
-                        if (confirmation("Test 1?", 3, 10)) {
-                            courseChosen = TEST_COURSE_1;
-                        } else {
-                            screen = MAIN_MENU;
-                            draw_main_menu_screen(test_button, perf_test_button, competition_button);
-                        }
-                        break;
-
-                    case 2:
-                        if (confirmation("Test 2?", 3, 10)) {
-                            courseChosen = TEST_COURSE_2;
-                        } else {
-                            screen = MAIN_MENU;
-                            draw_main_menu_screen(test_button, perf_test_button, competition_button);
-                        }
-                        break;
-                        
-                    case 3:
-                        if (confirmation("Test 3?", 3, 10)) {
-                            courseChosen = TEST_COURSE_3;
-                        } else {
-                            screen = MAIN_MENU;
-                            draw_main_menu_screen(test_button, perf_test_button, competition_button);
-                        }
-                        break;
-                    case 4:
-                        if (confirmation("Calibrate Servos?", 3, 5)) {
-                            courseChosen = CALIBRATE_SERVOS;
-                        } else {
-                            screen = MAIN_MENU;
-                            draw_main_menu_screen(test_button, perf_test_button, competition_button);
-                        }
-                        break;
-    
-                    default:
-                        continue;
-                }
-            }
-        } // End TEST_MENU button check
-
-        // Checks buttons on PERFORMANCE_MENU
-        while (screen == PERFORMANCE_MENU && !courseChosen) {
-
-            // Initializes selection
-            selection = 0;
-
-            // Loops through performance button array upon touch
-            if (LCD.Touch(&xTouch, &yTouch)) {
-                for (int i = 0; i < 4; i++) {
-                    if (performanceTests[i].Pressed(xTouch, yTouch, 0)) {
-                        selection = i+1;
-                    }
-                }
-
-                // Responds to which button was pressed
-                switch (selection) {
-                    case 1:
-                        if (confirmation("Perf. 1?", 3, 9)) {
-                            courseChosen = PERF_COURSE_1;
-                        } else {
-                            screen = MAIN_MENU;
-                            draw_main_menu_screen(test_button, perf_test_button, competition_button);
-                        }
-                        break;
-
-                    case 2:
-                        if (confirmation("Perf. 2?", 3, 9)) {
-                            courseChosen = PERF_COURSE_2;
-                        } else {
-                            screen = MAIN_MENU;
-                            draw_main_menu_screen(test_button, perf_test_button, competition_button);
-                        }
-                        break;
-
-                    case 3:
-                        if (confirmation("Perf. 3?", 3, 9)) {
-                            courseChosen = PERF_COURSE_3;
-                        } else {
-                            screen = MAIN_MENU;
-                            draw_main_menu_screen(test_button, perf_test_button, competition_button);
-                        }
-                        break;
-
-                    case 4:
-                        if (confirmation("Perf. 4?", 3, 9)) {
-                            courseChosen = PERF_COURSE_4;
-                        } else {
-                            screen = MAIN_MENU;
-                            draw_main_menu_screen(test_button, perf_test_button, competition_button);
-                        }
-                        break;
-                    default:
-                        continue;
-                }
-            }
-        } // End PERFORMANCE_MENU button check
-
-        // Checks buttons on COMPETITION_MENU
-        while (screen == COMPETITION_MENU && !courseChosen) {
-
-            // Initializes selection
-            selection = 0;
-
-            // Loops through performance button array upon touch
-            if (LCD.Touch(&xTouch, &yTouch)) {
-                for (int i = 0; i < 3; i++) {
-                    if (competitions[i].Pressed(xTouch, yTouch, 0)) {
-                        selection = i+1;
-                    }
-                }
-
-                // Responds to which button was pressed
-                switch (selection) {
-                    case 1:
-                        if (confirmation("Ind. Comp.?", 3, 8)) {
-                            courseChosen = IND_COMP;
-                        } else {
-                            screen = MAIN_MENU;
-                            draw_main_menu_screen(test_button, perf_test_button, competition_button);
-                        }
-                        break;
-
-                    case 2:
-                        if (confirmation("Final Comp.?", 3, 8)) {
-                            courseChosen = FINAL_COMP;
-                        } else {
-                            screen = MAIN_MENU;
-                            draw_main_menu_screen(test_button, perf_test_button, competition_button);
-                        }
-                        break;
-
-                    default:
-                        continue;
-                }
-            }
-        } // End COMPETITION_MENU button check
-        
-    }
-
-    return courseChosen;
-
-}
-
-/*******************************************************
  * @brief Waits until the start light to run the course
  * 
+ * @param timeToCheck time allotted to check for start light before timeout
  * @return int The status of the light
  *         1 -> ON
  *         0 -> OFF
@@ -696,7 +337,7 @@ int read_start_light(double timeToCheck) {
 
 /*******************************************************
  * @brief Moves CENTER OF ROBOT forward a number of inches using encoders
- * @author Steven Broaddus
+ * 
  * @param percent - Percent for the motors to run at. Negative for reverse.
  * @param inches - Inches to move forward .
  */
@@ -857,7 +498,8 @@ void turn_left_degrees(int percent, float degrees) {
 /*******************************************************
  * @brief Corrects the heading using RPS, pulses to correct heading
  * 
- * @param headingDegrees Heading to correct to in degrees
+ * @param heading Heading to correct to in degrees
+ * @param secondsToCheck Time allotted before timeout
  */
 void RPS_correct_heading(float heading, double secondsToCheck) {
     /*
@@ -949,9 +591,10 @@ void RPS_correct_heading(float heading, double secondsToCheck) {
 
 /*******************************************************
  * @brief Checks and corrects the x-coord of the robot using RPS. Makes sure the robot is facing 
- * east/west to correct movement
+ * east/west to correct movement.
  * 
  * @param x_coord Desired x-coord of the robot
+ * @param secondsToCheck Time to check before timeout
  */
 void RPS_check_x(float x_coord, double secondsToCheck) {
 
@@ -1031,6 +674,7 @@ void RPS_check_x(float x_coord, double secondsToCheck) {
  * north/south to correct movement.
  * 
  * @param y_coord Desired y-coord of the robot
+ * @param secondsToCheck Time to check before timeout
  */
 void RPS_check_y(float y_coord, double secondsToCheck) {
 
@@ -1106,6 +750,10 @@ void RPS_check_y(float y_coord, double secondsToCheck) {
 /*******************************************************************/
 // PID STUFF
 
+/*******************************************************
+ * @brief Resets all PID global variables to initial values.
+ * 
+ */
 void ResetPIDVariables() {
     
     // Resets all variables to inital state
@@ -1147,6 +795,12 @@ void ResetPIDVariables() {
     Sleep(0.15);
 }
 
+/*******************************************************
+ * @brief Makes adjustments to right motor based on expected speed, counts, and current motor speed.
+ * 
+ * @param expectedSpeed Expected speed for motor in inches per second
+ * @return float Correction value used to change motor in move functions
+ */
 float RightPIDAdjustment(double expectedSpeed) {
 
     // Finds change in counts since last time
@@ -1181,6 +835,12 @@ float RightPIDAdjustment(double expectedSpeed) {
     return (PID_OLD_MOTOR_POWERR + PTermR + ITermR + DTermR);
 }
 
+/*******************************************************
+ * @brief Makes adjustments to left motor based on expected speed, counts, and current motor speed.
+ * 
+ * @param expectedSpeed Expected speed for motor in inches per second
+ * @return float Correction value used to change motor in move functions
+ */
 float LeftPIDAdjustment(double expectedSpeed) {
     
     // Finds change in counts since last time
@@ -1215,91 +875,28 @@ float LeftPIDAdjustment(double expectedSpeed) {
     return (PID_OLD_MOTOR_POWERL + PTermL + ITermL + DTermL);
 }
 
+/*******************************************************
+ * @brief Uses PID to move forward a number of inches at a specific speed in inches per second.
+ * 
+ * @param in_per_sec Speed to move forward at in inches per second
+ * @param inches Inches to move forward
+ */
 void move_forward_PID(float in_per_sec, float inches) {
 
     ResetPIDVariables();
 
+    // Moves forward until average counts are above inches
     while ((((left_encoder.Counts() + right_encoder.Counts()) / 2) * PID_DISTANCE_PER_COUNT) < inches) {
         
+        // Calculates corrections to make
         PID_NEW_MOTOR_POWERR = RightPIDAdjustment(in_per_sec);
         PID_NEW_MOTOR_POWERL = LeftPIDAdjustment(in_per_sec);
         
+        // Applies corrections
         right_motor.SetPercent(PID_NEW_MOTOR_POWERR);
         left_motor.SetPercent(PID_NEW_MOTOR_POWERL);
 
-        PID_OLD_MOTOR_POWERR = PID_NEW_MOTOR_POWERR;
-        PID_OLD_MOTOR_POWERL = PID_NEW_MOTOR_POWERL;
-
-        Sleep(SLEEP_PID);
-    }
-
-    right_motor.Stop();
-    left_motor.Stop();
-    
-}
-
-void turn_left_PID(float in_per_sec, float degrees) {
-
-    double inches = ((degrees * PI) / 180.0) * (7.5 / 2);
-
-    ResetPIDVariables();
-
-    while ((((left_encoder.Counts() + right_encoder.Counts()) / 2) * PID_DISTANCE_PER_COUNT) < inches) {
-        
-        PID_NEW_MOTOR_POWERR = RightPIDAdjustment(in_per_sec);
-        PID_NEW_MOTOR_POWERL = LeftPIDAdjustment(in_per_sec);
-        
-        right_motor.SetPercent(PID_NEW_MOTOR_POWERR);
-        left_motor.SetPercent(-PID_NEW_MOTOR_POWERL);
-
-        PID_OLD_MOTOR_POWERR = PID_NEW_MOTOR_POWERR;
-        PID_OLD_MOTOR_POWERL = PID_NEW_MOTOR_POWERL;
-
-        Sleep(SLEEP_PID);
-    }
-
-    right_motor.Stop();
-    left_motor.Stop();
-    
-}
-
-void turn_right_PID(float in_per_sec, float degrees) {
-
-    double inches = ((degrees * PI) / 180.0) * (7.5 / 2);
-
-    ResetPIDVariables();
-
-    while ((((left_encoder.Counts() + right_encoder.Counts()) / 2) * PID_DISTANCE_PER_COUNT) < inches) {
-        
-        PID_NEW_MOTOR_POWERR = RightPIDAdjustment(in_per_sec);
-        PID_NEW_MOTOR_POWERL = LeftPIDAdjustment(in_per_sec);
-        
-        right_motor.SetPercent(-PID_NEW_MOTOR_POWERR);
-        left_motor.SetPercent(PID_NEW_MOTOR_POWERL);
-
-        PID_OLD_MOTOR_POWERR = PID_NEW_MOTOR_POWERR;
-        PID_OLD_MOTOR_POWERL = PID_NEW_MOTOR_POWERL;
-
-        Sleep(SLEEP_PID);
-    }
-
-    right_motor.Stop();
-    left_motor.Stop();
-    
-}
-
-void reverse_PID(float in_per_sec, float inches) {
-
-    ResetPIDVariables();
-
-    while ((((left_encoder.Counts() + right_encoder.Counts()) / 2) * PID_DISTANCE_PER_COUNT) < inches) {
-        
-        PID_NEW_MOTOR_POWERR = RightPIDAdjustment(in_per_sec);
-        PID_NEW_MOTOR_POWERL = LeftPIDAdjustment(in_per_sec);
-        
-        right_motor.SetPercent(-PID_NEW_MOTOR_POWERR);
-        left_motor.SetPercent(-PID_NEW_MOTOR_POWERL);
-
+        // Records old motor values for future corrections
         PID_OLD_MOTOR_POWERR = PID_NEW_MOTOR_POWERR;
         PID_OLD_MOTOR_POWERL = PID_NEW_MOTOR_POWERL;
 
@@ -1332,11 +929,12 @@ void initiateServos() {
 
 /*******************************************************
  * @brief Detects the color using the CdS cell
+ *
+ * @param timeToDetect time the robot takes to detect if it doesn't see the color right away
  * 
  * @return int color Color detected.
  *          0 -> Red
  *          1 -> Blue
- * @param timeToDetect time the robot takes to detect if it doesn't see the color right away
  */
 int detect_color(int timeToDetect) {
     LCD.Clear();
@@ -1415,7 +1013,6 @@ int detect_color(int timeToDetect) {
 
 /*******************************************************
  * @brief Presses jukebox buttons based on color.
- * @author Steven Broaddus
  */
 void press_jukebox_buttons() {
     
@@ -1596,7 +1193,6 @@ void flip_ice_cream_lever() {
         turn_left_degrees(TURN_SPEED, 90);
         move_forward_inches(FORWARD_SPEED, distBtwLevers);
         turn_right_degrees(TURN_SPEED, 90);
-        //RPS_correct_heading(135);
 
         write_status("Pushing lever down");
         base_servo.SetDegree(85);
@@ -1660,7 +1256,6 @@ void flip_ice_cream_lever() {
         turn_left_degrees(TURN_SPEED, 90);
         move_forward_inches(-FORWARD_SPEED, distBtwLevers);
         turn_right_degrees(TURN_SPEED, 90);
-        //RPS_correct_heading(135);
 
         write_status("Pushing lever down");
         base_servo.SetDegree(85);
@@ -1702,17 +1297,18 @@ void flip_ice_cream_lever() {
  * @param status Status to be printed
  */
 void write_status(const char status[]) {
+
+    // Clears space and writes status to ccreen
     LCD.SetFontColor(BACKGROUND_COLOR);
-    LCD.FillRectangle(0, 17,319,17);
+    LCD.FillRectangle(0, 17, 319, 17);
     LCD.SetFontColor(FONT_COLOR);
-    LCD.WriteRC(status,1,2);
+    LCD.WriteRC(status, 1, 2);
 }
 
 /*******************************************************
  * @brief Shows the current RPS data.
  * 
  * @pre RPS must be initialized.
- * 
  */
 void show_RPS_data() {
 
@@ -1742,8 +1338,8 @@ void show_RPS_data() {
 }
 
 /*******************************************************
- * @brief Runs the specified course
- * @author Steven Broaddus
+ * @brief Runs the specified course.
+ * 
  * @param courseNumber Course number to runs
  */
 void run_course(int courseNumber) {
@@ -1765,6 +1361,8 @@ void run_course(int courseNumber) {
     switch (courseNumber)
     {
     case TEST_COURSE_1: // Test course 1
+
+        // Moves left/right upon touch
         write_status("Running Test 1");
 
         int xGarb, yGarb;
@@ -1781,6 +1379,8 @@ void run_course(int courseNumber) {
         break;
 
     case TEST_COURSE_2: // Test course 1
+
+        // Moves forward indefinitely
         write_status("Running Test 2");
 
         int xTrash2, yTrash2;
@@ -1797,6 +1397,8 @@ void run_course(int courseNumber) {
         break;
 
     case TEST_COURSE_3: // Test course 1
+
+        // Moves base/on_arm servos upon touch
         write_status("Running Test 3");
 
         float degreesToTurnBase, degreesToTurnArm;
@@ -2540,42 +2142,14 @@ int main() {
     LCD.Clear();
 
     // Gets RPS heading values to decrease inconsistencies from course to course
-    // Clears screen to a green screen until touch is detected
+    // Clears screen to a yellow screen until touch is detected
     update_RPS_Heading_values(60, true, true, true);
-
-    // Initializes menu and returns chosen course number
-    // Commented out since QR code stand is too small to easily navigate over Proteus
-    // int courseNumber = start_menu();
 
     // Waits until start light is read
     read_start_light(45);
-    // Sleep(1.0);
 
     // Runs specified course number.
     run_course(FINAL_COMP);
-
-    //flip_ice_cream_lever();
-
-    //*****************************************
-    // TEST CODE
-
-    //**********************************
-    //Show RPS stuff
-    // LCD.Clear();
-    // while (true) {
-    //     show_RPS_data();
-    //     Sleep(0.1);
-    // }
-
-    // Show CdS Cell Value
-    // LCD.Clear();
-    // while (true) {
-    //     LCD.WriteRC(CdS_cell.Value(),1,2);
-    //     Sleep(0.25);
-    //     LCD.Clear();
-    // }
-    
-    //*****************************************
 
     return 0;
 }

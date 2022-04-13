@@ -1696,211 +1696,211 @@ void run_course(int courseNumber) {
         break;
 
     case IND_COMP: // Individual Competition
-        write_status("Running Individual Competition");
+    write_status("Running Individual Competition");
 
-        /*********************************************************************/
-        // Jukebox
+    /*********************************************************************/
+    // Jukebox
 
-            //************
-            write_status("Moving towards jukebox");
+        //************
+        write_status("Moving towards jukebox");
 
-            // Heads from button to center
-            move_forward_inches(FORWARD_SPEED, 9 + DIST_AXIS_CDS); // Direct: 7.5 inches 
+        // Heads from button to center
+        move_forward_inches(FORWARD_SPEED, 9 + DIST_AXIS_CDS); // Direct: 7.5 inches 
 
-            // Moves towards jukebox
-            turn_left_degrees(TURN_SPEED, 45);
+        // Moves towards jukebox
+        turn_left_degrees(TURN_SPEED, 45);
 
-            // Moves on_arm_servo out of the way
-            on_arm_servo.SetDegree(90); 
+        // Moves on_arm_servo out of the way
+        on_arm_servo.SetDegree(90); 
 
-            // Over CdS cell
-            move_forward_inches(FORWARD_SPEED, 11.5 - 1.0607);
-            RPS_check_x(RPS_Top_Level_X_Reference - 7.8, 2); // Initially 8.8 left of top x reference
+        // Over CdS cell
+        move_forward_inches(FORWARD_SPEED, 11.5 - 1.0607);
+        RPS_check_x(RPS_Top_Level_X_Reference - 7.8, 2); // Initially 8.8 left of top x reference
 
-            // Face jukebox
-            turn_left_degrees(TURN_SPEED, 90);
+        // Face jukebox
+        turn_left_degrees(TURN_SPEED, 90);
 
-            //Reverses to move CdS cell over jukebox light and make room for arm
-            move_forward_inches(-FORWARD_SPEED, DIST_AXIS_CDS + 0.25 - 1.0607); // 0.5 wasn't initially there
-            RPS_check_y(RPS_Top_Level_Y_Reference - 34, 2); // 35 below top y reference 18.3. Initially 33.7
+        //Reverses to move CdS cell over jukebox light and make room for arm
+        move_forward_inches(-FORWARD_SPEED, DIST_AXIS_CDS + 0.25 - 1.0607); // 0.5 wasn't initially there
+        RPS_check_y(RPS_Top_Level_Y_Reference - 34, 2); // 35 below top y reference 18.3. Initially 33.7
+    
+        //************
+        write_status("Pressing jukebox buttons");
         
-            //************
-            write_status("Pressing jukebox buttons");
-            
-            // Presses jukebox buttons, returning to CdS cell over jukebox light
-            press_jukebox_buttons();
+        // Presses jukebox buttons, returning to CdS cell over jukebox light
+        press_jukebox_buttons();
 
-            // Sets on_arm_servo into initial position
-            on_arm_servo.SetDegree(180);
+        // Sets on_arm_servo into initial position
+        on_arm_servo.SetDegree(180);
 
-            // Moves back forward to axis over jukebox light
-            move_forward_inches(FORWARD_SPEED, DIST_AXIS_CDS);
-            
-            //************
-
-            write_status("Moving towards ramp");
-
-            // Moves to center (aligns with ramp)
-            turn_left_degrees(TURN_SPEED, 90);
-            move_forward_inches(FORWARD_SPEED, 9.25); // Initially 9
-            turn_left_degrees(TURN_SPEED, 90);
-
-        /*********************************************************************/
-        // Ramp
-
-            // Moves up ramp 9 inches from jukebox light
-            // OR 11.75 + DIST_AXIS_CDS from starting light
-            write_status("Moving up ramp");
-
-            // Checks that it is positioned straight
-            RPS_correct_heading(RPS_90_Degrees, 2);
-
-            // Subtracts three to avoid dead zone
-            // Gets to that place on top of the ramp (52.25, 15.45)
-            move_forward_inches(RAMP_SPEED, 30.26 + DIST_AXIS_CDS); // Initially 30.26 + DIST_AXIS_CDS. Took off because no longer moves forward after jukebox
-
-            // Checks x and y coordinate after going up
-            // RPS_check_y(RPS_Top_Level_Y_Reference, 2); 
-
-            // Checks x (may need to edit)
-            //turn_left_degrees(TURN_SPEED, 90); 
-            turn_right_degrees(TURN_SPEED, 90); // Initially 180 degrees to correct for RPS check
-            RPS_check_x(RPS_Top_Level_X_Reference + 4.65, 2);
-            
-
-
-        /*********************************************************************/
-        // Sink
-
-            // Reverses towards sink
-            move_forward_inches(-FORWARD_SPEED, 9.25); 
-
-            // Aligns and backs up to edge of sink (~8 inches away)
-            turn_left_degrees(TURN_SPEED, 90);
-            move_forward_seconds(-40, 1);
-            
-            write_status("Dropping tray");
-
-            // Moves servos to drop tray
-            base_servo.SetDegree(85.);
-            base_servo.SetDegree(105.);
-            Sleep(0.5); // Lets tray fall
-            base_servo.SetDegree(85.);
-
-            write_status("Moving away from sink");
-
-            // Drives away from sink
-            move_forward_inches(FORWARD_SPEED, 7.75);
-
-            // Moves towards that one spot on top (facing rightwards)
-            turn_right_degrees(TURN_SPEED, 90);
-            //RPS_correct_heading(RPS_0_Degrees, 2); // IN DEADZONE
-            move_forward_inches(FORWARD_SPEED, 9.25);
-
+        // Moves back forward to axis over jukebox light
+        move_forward_inches(FORWARD_SPEED, DIST_AXIS_CDS);
         
-        /*********************************************************************/
-        // Ticket
+        //************
 
-            // From that one spot on top (facing right)
-            write_status("Moving towards ticket");
+        write_status("Moving towards ramp");
 
-            // Turns to face left (to be able to reverse towards ticket)
-            turn_left_degrees(30, 180);
-            //RPS_check_x(RPS_Top_Level_X_Reference, 2); // 15.45
+        // Moves to center (aligns with ramp)
+        turn_left_degrees(TURN_SPEED, 90);
+        move_forward_inches(FORWARD_SPEED, 9.25); // Initially 9
+        turn_left_degrees(TURN_SPEED, 90);
 
-            // Reverses towards ticket
-            move_forward_inches(-FORWARD_SPEED, 13.25); // Initially 13.65
-            RPS_check_x(RPS_Top_Level_X_Reference + 13.25, 2);
+    /*********************************************************************/
+    // Ramp
 
-            // Facing ticket
-            turn_left_degrees(TURN_SPEED, 90);
+        // Moves up ramp 9 inches from jukebox light
+        // OR 11.75 + DIST_AXIS_CDS from starting light
+        write_status("Moving up ramp");
 
-            // Slides ticket from y=52.25
-            write_status("Sliding ticket");
-            on_arm_servo.SetDegree(43); // Initially 45
-            base_servo.SetDegree(0);
-            RPS_check_y(RPS_Top_Level_Y_Reference - 4.65, 2); // 52.25 - 4.65
+        // Checks that it is positioned straight
+        RPS_correct_heading(RPS_90_Degrees, 2);
+
+        // Subtracts three to avoid dead zone
+        // Gets to that place on top of the ramp (52.25, 15.45)
+        move_forward_inches(RAMP_SPEED, 30.26 + DIST_AXIS_CDS); // Initially 30.26 + DIST_AXIS_CDS. Took off because no longer moves forward after jukebox
+
+        // Checks x and y coordinate after going up
+        // RPS_check_y(RPS_Top_Level_Y_Reference, 2); 
+
+        // Checks x (may need to edit)
+        //turn_left_degrees(TURN_SPEED, 90); 
+        turn_right_degrees(TURN_SPEED, 90); // Initially 180 degrees to correct for RPS check
+        RPS_check_x(RPS_Top_Level_X_Reference + 4.65, 2);
         
-            move_forward_inches(20, 4.75); // Inserts arm into ticket slot, initially 0.25
 
-            // Reverses away from ticket
-            on_arm_servo.SetDegree(180);
-            move_forward_inches(-20, 4.75);
 
-        /*********************************************************************/
-        // Hot Plate
+    /*********************************************************************/
+    // Sink
 
-            // From in front of ticket
-            write_status("Moving towards hot plate");
-            
-            // Resets arm positions
-            on_arm_servo.SetDegree(8);
-            base_servo.SetDegree(85);
+        // Reverses towards sink
+        move_forward_inches(-FORWARD_SPEED, 9.25); 
 
-            // Moves towards the front
-            turn_right_degrees(TURN_SPEED, 90);
-            move_forward_inches(FORWARD_SPEED, 6); // Initially 5.85
-            RPS_check_x(RPS_Top_Level_X_Reference + 7.65, 4); // Initially 7.8
-            turn_right_degrees(TURN_SPEED, 90);
+        // Aligns and backs up to edge of sink (~8 inches away)
+        turn_left_degrees(TURN_SPEED, 90);
+        move_forward_seconds(-40, 1);
+        
+        write_status("Dropping tray");
 
-            // Currently at y=52.25, needs to be at y=55
-            move_forward_inches(FORWARD_SPEED, 2.75); // 2.75 initially
-            RPS_check_y(RPS_Top_Level_Y_Reference + 2.75, 4);
+        // Moves servos to drop tray
+        base_servo.SetDegree(85.);
+        base_servo.SetDegree(105.);
+        Sleep(0.5); // Lets tray fall
+        base_servo.SetDegree(85.);
 
-            /* 
-             * Flips burger when y=55 and facing towards it
-             * Finishes at y=56.45 in front of first plate
-             */
-            flip_burger();
+        write_status("Moving away from sink");
 
-            RPS_check_y(RPS_Top_Level_Y_Reference + 4, 2); // Initially 55.95, initially plus 3.7
+        // Drives away from sink
+        move_forward_inches(FORWARD_SPEED, 7.75);
 
-            turn_left_degrees(TURN_SPEED, 90);
+        // Moves towards that one spot on top (facing rightwards)
+        turn_right_degrees(TURN_SPEED, 90);
+        //RPS_correct_heading(RPS_0_Degrees, 2); // IN DEADZONE
+        move_forward_inches(FORWARD_SPEED, 9.25);
 
-            // In front of initial plate, 4.05 inches from front, heading=0
-            RPS_check_x(RPS_Top_Level_X_Reference + 7.4, 2); // Initially 21.7
-            
+    
+    /*********************************************************************/
+    // Ticket
 
-        /*********************************************************************/
-        // Ice cream lever
+        // From that one spot on top (facing right)
+        write_status("Moving towards ticket");
 
-            // From after flip_burger() (at y=55 in front of reverse plate (5.8 inches right from front))
-            // Needs to be at y=56.45 and x=15.45 (LEFT) (Can't check x though at y=56.45 since DEAD ZONE)
-            write_status("Moving towards ice cream");
-            
-            move_forward_inches(20, 5); // Moves to x=15.45, initially 5.75
-            //RPS_check_x(15.45); // IN DEADZONE
+        // Turns to face left (to be able to reverse towards ticket)
+        turn_left_degrees(30, 180);
+        //RPS_check_x(RPS_Top_Level_X_Reference, 2); // 15.45
 
-            // Faces towards levers
-            turn_right_degrees(TURN_SPEED, 45);
+        // Reverses towards ticket
+        move_forward_inches(-FORWARD_SPEED, 13.25); // Initially 13.65
+        RPS_check_x(RPS_Top_Level_X_Reference + 13.25, 2);
 
-            /*
-             * Flips correct ice cream lever when y=56.45 (VERTICALLY) and x=15.45 (LEFT)
-             * Must be facing towards ice cream levers.
-             * Finishes where it started.
-             */
-            flip_ice_cream_lever();
+        // Facing ticket
+        turn_left_degrees(TURN_SPEED, 90);
 
-        /*********************************************************************/
-        // Final button
+        // Slides ticket from y=52.25
+        write_status("Sliding ticket");
+        on_arm_servo.SetDegree(43); // Initially 45
+        base_servo.SetDegree(0);
+        RPS_check_y(RPS_Top_Level_Y_Reference - 4.65, 2); // 52.25 - 4.65
+    
+        move_forward_inches(20, 4.75); // Inserts arm into ticket slot, initially 0.25
 
-            // From after flip_ice_cream_lever()
-            // y=56.45, x=15.45 FACING LEVERS
-            write_status("Moving towards final button");
+        // Reverses away from ticket
+        on_arm_servo.SetDegree(180);
+        move_forward_inches(-20, 4.75);
 
-            // Turns to reverse down ramp
-            turn_right_degrees(TURN_SPEED, 45);
+    /*********************************************************************/
+    // Hot Plate
 
-            // Reverses back out of dead zone to check heading
-            move_forward_inches(-FORWARD_SPEED, 4.20);
-            RPS_correct_heading(RPS_90_Degrees, 4);
+        // From in front of ticket
+        write_status("Moving towards hot plate");
+        
+        // Resets arm positions
+        on_arm_servo.SetDegree(8);
+        base_servo.SetDegree(85);
 
-            // Moves down ramp
-            move_forward_inches(-FORWARD_SPEED, 30.26);
+        // Moves towards the front
+        turn_right_degrees(TURN_SPEED, 90);
+        move_forward_inches(FORWARD_SPEED, 6); // Initially 5.85
+        RPS_check_x(RPS_Top_Level_X_Reference + 7.65, 4); // Initially 7.8
+        turn_right_degrees(TURN_SPEED, 90);
 
-            // Heads towards final button
-            turn_left_degrees(TURN_SPEED, 45);
-            move_forward_inches(-FORWARD_SPEED, 20);
+        // Currently at y=52.25, needs to be at y=55
+        move_forward_inches(FORWARD_SPEED, 2.75); // 2.75 initially
+        RPS_check_y(RPS_Top_Level_Y_Reference + 2.75, 4);
+
+        /* 
+            * Flips burger when y=55 and facing towards it
+            * Finishes at y=56.45 in front of first plate
+            */
+        flip_burger();
+
+        RPS_check_y(RPS_Top_Level_Y_Reference + 4, 2); // Initially 55.95, initially plus 3.7
+
+        turn_left_degrees(TURN_SPEED, 90);
+
+        // In front of initial plate, 4.05 inches from front, heading=0
+        RPS_check_x(RPS_Top_Level_X_Reference + 7.4, 2); // Initially 21.7
+        
+
+    /*********************************************************************/
+    // Ice cream lever
+
+        // From after flip_burger() (at y=55 in front of reverse plate (5.8 inches right from front))
+        // Needs to be at y=56.45 and x=15.45 (LEFT) (Can't check x though at y=56.45 since DEAD ZONE)
+        write_status("Moving towards ice cream");
+        
+        move_forward_inches(20, 5); // Moves to x=15.45, initially 5.75
+        //RPS_check_x(15.45); // IN DEADZONE
+
+        // Faces towards levers
+        turn_right_degrees(TURN_SPEED, 45);
+
+        /*
+            * Flips correct ice cream lever when y=56.45 (VERTICALLY) and x=15.45 (LEFT)
+            * Must be facing towards ice cream levers.
+            * Finishes where it started.
+            */
+        flip_ice_cream_lever();
+
+    /*********************************************************************/
+    // Final button
+
+        // From after flip_ice_cream_lever()
+        // y=56.45, x=15.45 FACING LEVERS
+        write_status("Moving towards final button");
+
+        // Turns to reverse down ramp
+        turn_right_degrees(TURN_SPEED, 45);
+
+        // Reverses back out of dead zone to check heading
+        move_forward_inches(-FORWARD_SPEED, 4.20);
+        RPS_correct_heading(RPS_90_Degrees, 4);
+
+        // Moves down ramp
+        move_forward_inches(-FORWARD_SPEED, 30.26);
+
+        // Heads towards final button
+        turn_left_degrees(TURN_SPEED, 45);
+        move_forward_inches(-FORWARD_SPEED, 20);
 
 
         break;

@@ -1723,7 +1723,7 @@ void run_course(int courseNumber) {
             //Reverses to move CdS cell over jukebox light and make room for arm
             move_forward_inches(-FORWARD_SPEED, DIST_AXIS_CDS + 0.25 - 1.0607); // 0.5 wasn't initially there
             RPS_check_y(RPS_Top_Level_Y_Reference - 34, 2); // 35 below top y reference 18.3. Initially 33.7
-        
+
             //************
             write_status("Pressing jukebox buttons");
             
@@ -1797,7 +1797,7 @@ void run_course(int courseNumber) {
             //RPS_correct_heading(RPS_0_Degrees, 2); // IN DEADZONE
             move_forward_inches(FORWARD_SPEED, 9.25);
 
-        
+
         /*********************************************************************/
         // Ticket
 
@@ -1820,7 +1820,7 @@ void run_course(int courseNumber) {
             on_arm_servo.SetDegree(43); // Initially 45
             base_servo.SetDegree(0);
             RPS_check_y(RPS_Top_Level_Y_Reference - 4.65, 2); // 52.25 - 4.65
-        
+
             move_forward_inches(20, 4.75); // Inserts arm into ticket slot, initially 0.25
 
             // Reverses away from ticket
@@ -1848,9 +1848,9 @@ void run_course(int courseNumber) {
             RPS_check_y(RPS_Top_Level_Y_Reference + 2.75, 4);
 
             /* 
-             * Flips burger when y=55 and facing towards it
-             * Finishes at y=56.45 in front of first plate
-             */
+                * Flips burger when y=55 and facing towards it
+                * Finishes at y=56.45 in front of first plate
+                */
             flip_burger();
 
             RPS_check_y(RPS_Top_Level_Y_Reference + 4, 2); // Initially 55.95, initially plus 3.7
@@ -1875,10 +1875,10 @@ void run_course(int courseNumber) {
             turn_right_degrees(TURN_SPEED, 45);
 
             /*
-             * Flips correct ice cream lever when y=56.45 (VERTICALLY) and x=15.45 (LEFT)
-             * Must be facing towards ice cream levers.
-             * Finishes where it started.
-             */
+            * Flips correct ice cream lever when y=56.45 (VERTICALLY) and x=15.45 (LEFT)
+            * Must be facing towards ice cream levers.
+            * Finishes where it started.
+            */
             flip_ice_cream_lever();
 
         /*********************************************************************/
@@ -1934,7 +1934,7 @@ void run_course(int courseNumber) {
             //Reverses to move CdS cell over jukebox light and make room for arm
             move_forward_inches(-FORWARD_SPEED, DIST_AXIS_CDS + 0.25 - 1.0607); // 0.5 wasn't initially there
             RPS_check_y(RPS_Top_Level_Y_Reference - 33.75, 2); // 35 below top y reference 18.3. Initially 33.7
-        
+
             //************
             write_status("Pressing jukebox buttons");
             
@@ -2009,7 +2009,7 @@ void run_course(int courseNumber) {
             //RPS_correct_heading(RPS_0_Degrees, 2); // IN DEADZONE
             move_forward_inches(FORWARD_SPEED, 8.5);
 
-        
+
         /*********************************************************************/
         // Ticket
 
@@ -2032,7 +2032,7 @@ void run_course(int courseNumber) {
             on_arm_servo.SetDegree(45); // Initially 45
             base_servo.SetDegree(0);
             RPS_check_y(RPS_Top_Level_Y_Reference - 4.65, 8); // 52.25 - 4.65
-        
+
             move_forward_inches(20, 5.25); // Inserts arm into ticket slot, initially 0.25
 
             // Reverses away from ticket
@@ -2062,9 +2062,9 @@ void run_course(int courseNumber) {
             RPS_check_y(RPS_Top_Level_Y_Reference + 2.75, 4);
 
             /* 
-             * Flips burger when y=55 and facing towards it
-             * Finishes at y=56.45 in front of first plate
-             */
+                * Flips burger when y=55 and facing towards it
+                * Finishes at y=56.45 in front of first plate
+                */
             flip_burger();
 
             RPS_check_y(RPS_Top_Level_Y_Reference + 4, 4); // Initially 55.95, initially plus 3.7
@@ -2089,10 +2089,10 @@ void run_course(int courseNumber) {
             turn_right_degrees(TURN_SPEED, 45);
 
             /*
-             * Flips correct ice cream lever when y=56.45 (VERTICALLY) and x=15.45 (LEFT)
-             * Must be facing towards ice cream levers.
-             * Finishes where it started.
-             */
+                * Flips correct ice cream lever when y=56.45 (VERTICALLY) and x=15.45 (LEFT)
+                * Must be facing towards ice cream levers.
+                * Finishes where it started.
+                */
             flip_ice_cream_lever();
 
         /*********************************************************************/

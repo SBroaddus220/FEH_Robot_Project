@@ -72,6 +72,33 @@ float RPS_270_Degrees = 270;
 float RPS_Top_Level_X_Reference = 15.45;
 float RPS_Top_Level_Y_Reference = 52.25;
 
+// *****************************************
+// Global variables for PID (Will make class later)
+
+// PID Right Motor
+double PID_Linear_SpeedR, PID_New_CountsR, PID_Last_CountsR, PID_New_TimeR, PID_Last_TimeR, PID_New_Speed_ErrorR, PID_Last_Speed_ErrorR, PID_Error_SumR;
+float PID_NEW_MOTOR_POWERR, PID_OLD_MOTOR_POWERR;
+double PTermR, ITermR, DTermR;
+
+double PConstR = 0.75;
+double IConstR = 0.05; 
+double DConstR = 0.25;
+
+// PID Left Motor
+double PID_Linear_SpeedL, PID_New_CountsL, PID_Last_CountsL, PID_New_TimeL, PID_Last_TimeL, PID_New_Speed_ErrorL, PID_Last_Speed_ErrorL, PID_Error_SumL;
+float PID_NEW_MOTOR_POWERL, PID_OLD_MOTOR_POWERL;
+double PTermL, ITermL, DTermL;
+
+double PConstL = 0.75; // 0.75
+double IConstL = 0.05; 
+double DConstL = 0.25;
+
+// Both
+double PID_TIME;
+double PID_DISTANCE_PER_COUNT = ((2 * 3.14159265 * 1.25) / 318);
+
+#define SLEEP_PID 0.15
+
 /************************************************/
 // Course numbers. Used in start_menu() and run_course()
 enum { 
@@ -1076,6 +1103,214 @@ void RPS_check_y(float y_coord, double secondsToCheck) {
     }
 }
 
+/*******************************************************************/
+// PID STUFF
+
+void ResetPIDVariables() {
+    
+    // Resets all variables to inital state
+    PID_Linear_SpeedR = 0;
+    PID_New_CountsR = 0;
+    PID_Last_CountsR = 0;
+    PID_New_TimeR = 0;
+    PID_Last_TimeR = 0;
+    PID_New_Speed_ErrorR = 0;
+    PID_Last_Speed_ErrorR = 0;
+    PID_OLD_MOTOR_POWERR = 0;
+    PID_NEW_MOTOR_POWERR = 0;
+    PID_Linear_SpeedR = 0;
+    PTermR = 0;
+    ITermR = 0;
+    DTermR = 0;
+
+    PID_Linear_SpeedL = 0;
+    PID_New_CountsL = 0;
+    PID_Last_CountsL = 0;
+    PID_New_TimeL = 0;
+    PID_Last_TimeL = 0;
+    PID_New_Speed_ErrorL = 0;
+    PID_Last_Speed_ErrorL = 0;
+    PID_OLD_MOTOR_POWERL = 0;
+    PID_NEW_MOTOR_POWERL = 0;
+    PID_Linear_SpeedL = 0;
+    PTermL = 0;
+    ITermL = 0;
+    DTermL = 0;
+    
+    // Records initial time
+    PID_TIME = TimeNow();
+
+    // Resets encoders
+    left_encoder.ResetCounts();
+    right_encoder.ResetCounts();
+
+    Sleep(0.15);
+}
+
+float RightPIDAdjustment(double expectedSpeed) {
+
+    // Finds change in counts since last time
+    PID_Last_CountsR = PID_New_CountsR;
+    PID_New_CountsR = right_encoder.Counts();
+    
+    // Finds change in time since last time
+    PID_Last_TimeR = PID_New_TimeR;
+    PID_New_TimeR = TimeNow();
+
+    // Finds actual velocity
+    PID_Linear_SpeedR = (PID_DISTANCE_PER_COUNT * ((PID_New_CountsR - PID_Last_CountsR) / (PID_New_TimeR - PID_Last_TimeR)));
+
+    // Finds error
+    PID_New_Speed_ErrorR = expectedSpeed - PID_Linear_SpeedR;
+
+    // Adds error to error sum
+    PID_Error_SumR += PID_New_Speed_ErrorR;
+
+    // Calculates PTerm
+    PTermR = PID_New_Speed_ErrorR * PConstR;
+
+    // Calculates ITerm
+    ITermR = PID_Error_SumR * IConstR;
+
+    // Calculates DTerm
+    DTermR = (PID_New_Speed_ErrorR - PID_Last_Speed_ErrorR) * DConstR;
+
+    // Saves past error
+    PID_Last_Speed_ErrorR = PID_New_Speed_ErrorR;
+
+    return (PID_OLD_MOTOR_POWERR + PTermR + ITermR + DTermR);
+}
+
+float LeftPIDAdjustment(double expectedSpeed) {
+    
+    // Finds change in counts since last time
+    PID_Last_CountsL = PID_New_CountsL;
+    PID_New_CountsL = left_encoder.Counts();
+    
+    // Finds change in time since last time
+    PID_Last_TimeL = PID_New_TimeL;
+    PID_New_TimeL = TimeNow();
+
+    // Finds actual velocity
+    PID_Linear_SpeedL = (PID_DISTANCE_PER_COUNT * ((PID_New_CountsL - PID_Last_CountsL) / (PID_New_TimeL - PID_Last_TimeL)));
+
+    // Finds error
+    PID_New_Speed_ErrorL = expectedSpeed - PID_Linear_SpeedL;
+
+    // Adds error to error sum
+    PID_Error_SumL += PID_New_Speed_ErrorL;
+
+    // Calculates PTerm
+    PTermL = PID_New_Speed_ErrorL * PConstL;
+
+    // Calculates ITerm
+    ITermL = PID_Error_SumL * IConstL;
+
+    // Calculates DTerm
+    DTermL = (PID_New_Speed_ErrorL - PID_Last_Speed_ErrorL) * DConstL;
+
+    // Saves past error
+    PID_Last_Speed_ErrorL = PID_New_Speed_ErrorL;
+
+    return (PID_OLD_MOTOR_POWERL + PTermL + ITermL + DTermL);
+}
+
+void move_forward_PID(float in_per_sec, float inches) {
+
+    ResetPIDVariables();
+
+    while ((((left_encoder.Counts() + right_encoder.Counts()) / 2) * PID_DISTANCE_PER_COUNT) < inches) {
+        
+        PID_NEW_MOTOR_POWERR = RightPIDAdjustment(in_per_sec);
+        PID_NEW_MOTOR_POWERL = LeftPIDAdjustment(in_per_sec);
+        
+        right_motor.SetPercent(PID_NEW_MOTOR_POWERR);
+        left_motor.SetPercent(PID_NEW_MOTOR_POWERL);
+
+        PID_OLD_MOTOR_POWERR = PID_NEW_MOTOR_POWERR;
+        PID_OLD_MOTOR_POWERL = PID_NEW_MOTOR_POWERL;
+
+        Sleep(SLEEP_PID);
+    }
+
+    right_motor.Stop();
+    left_motor.Stop();
+    
+}
+
+void turn_left_PID(float in_per_sec, float degrees) {
+
+    double inches = ((degrees * PI) / 180.0) * (7.5 / 2);
+
+    ResetPIDVariables();
+
+    while ((((left_encoder.Counts() + right_encoder.Counts()) / 2) * PID_DISTANCE_PER_COUNT) < inches) {
+        
+        PID_NEW_MOTOR_POWERR = RightPIDAdjustment(in_per_sec);
+        PID_NEW_MOTOR_POWERL = LeftPIDAdjustment(in_per_sec);
+        
+        right_motor.SetPercent(PID_NEW_MOTOR_POWERR);
+        left_motor.SetPercent(-PID_NEW_MOTOR_POWERL);
+
+        PID_OLD_MOTOR_POWERR = PID_NEW_MOTOR_POWERR;
+        PID_OLD_MOTOR_POWERL = PID_NEW_MOTOR_POWERL;
+
+        Sleep(SLEEP_PID);
+    }
+
+    right_motor.Stop();
+    left_motor.Stop();
+    
+}
+
+void turn_right_PID(float in_per_sec, float degrees) {
+
+    double inches = ((degrees * PI) / 180.0) * (7.5 / 2);
+
+    ResetPIDVariables();
+
+    while ((((left_encoder.Counts() + right_encoder.Counts()) / 2) * PID_DISTANCE_PER_COUNT) < inches) {
+        
+        PID_NEW_MOTOR_POWERR = RightPIDAdjustment(in_per_sec);
+        PID_NEW_MOTOR_POWERL = LeftPIDAdjustment(in_per_sec);
+        
+        right_motor.SetPercent(-PID_NEW_MOTOR_POWERR);
+        left_motor.SetPercent(PID_NEW_MOTOR_POWERL);
+
+        PID_OLD_MOTOR_POWERR = PID_NEW_MOTOR_POWERR;
+        PID_OLD_MOTOR_POWERL = PID_NEW_MOTOR_POWERL;
+
+        Sleep(SLEEP_PID);
+    }
+
+    right_motor.Stop();
+    left_motor.Stop();
+    
+}
+
+void reverse_PID(float in_per_sec, float inches) {
+
+    ResetPIDVariables();
+
+    while ((((left_encoder.Counts() + right_encoder.Counts()) / 2) * PID_DISTANCE_PER_COUNT) < inches) {
+        
+        PID_NEW_MOTOR_POWERR = RightPIDAdjustment(in_per_sec);
+        PID_NEW_MOTOR_POWERL = LeftPIDAdjustment(in_per_sec);
+        
+        right_motor.SetPercent(-PID_NEW_MOTOR_POWERR);
+        left_motor.SetPercent(-PID_NEW_MOTOR_POWERL);
+
+        PID_OLD_MOTOR_POWERR = PID_NEW_MOTOR_POWERR;
+        PID_OLD_MOTOR_POWERL = PID_NEW_MOTOR_POWERL;
+
+        Sleep(SLEEP_PID);
+    }
+
+    right_motor.Stop();
+    left_motor.Stop();
+    
+}
+
 /*******************************************************
  * @brief Initiates both servos, sets min/max values and 
  * turns it to starting rotation.
@@ -1216,9 +1451,9 @@ void press_jukebox_buttons() {
         base_servo.SetDegree(4);
         Sleep(0.5);
 
-        RPS_correct_heading(RPS_270_Degrees, 2);
+        RPS_correct_heading(RPS_270_Degrees, 4);
 
-        move_forward_seconds(20, secondsFromButtons + 0.5); // Moves forward until buttons
+        move_forward_seconds(20, secondsFromButtons + 0.75); // Moves forward until buttons
 
         move_forward_seconds(-20, secondsFromButtons); // Reverses from buttons
 
@@ -1248,7 +1483,7 @@ void press_jukebox_buttons() {
 
         RPS_correct_heading(RPS_270_Degrees, 2);
 
-        move_forward_seconds(20, secondsFromButtons + 0.5); // Moves forward until buttons
+        move_forward_seconds(20, secondsFromButtons + 0.75); // Moves forward until buttons
 
         move_forward_seconds(-20, secondsFromButtons); // Reverses from buttons
 
@@ -1288,7 +1523,7 @@ void flip_burger() {
     // Lowers base servo and moves it under hot plate
     base_servo.SetDegree(0);
     Sleep(1.0);
-    move_forward_inches(FORWARD_SPEED, 1.35); // Initially 2.25
+    move_forward_inches(FORWARD_SPEED, 1.15); // Initially 1.35
     
     Sleep(0.5);
 
@@ -1350,7 +1585,7 @@ void flip_ice_cream_lever() {
     float distBtwLevers = 4;
 
     // Time to sleep after pressing levers
-    float leverTimeSleep = 7.0;
+    float leverTimeSleep = 6.6;
     
     if (RPS.GetIceCream() == 0) { // VANILLA
 
@@ -2096,7 +2331,7 @@ void run_course(int courseNumber) {
 
             //Reverses to move CdS cell over jukebox light and make room for arm
             move_forward_inches(-FORWARD_SPEED, DIST_AXIS_CDS + 0.25 - 1.0607); // 0.5 wasn't initially there
-            RPS_check_y(RPS_Top_Level_Y_Reference - 34.5, 2); // 35 below top y reference 18.3. Initially 33.7
+            RPS_check_y(RPS_Top_Level_Y_Reference - 33.75, 2); // 35 below top y reference 18.3. Initially 33.7
         
             //************
             write_status("Pressing jukebox buttons");
@@ -2131,7 +2366,8 @@ void run_course(int courseNumber) {
 
             // Subtracts three to avoid dead zone
             // Gets to that place on top of the ramp (52.25, 15.45)
-            move_forward_inches(RAMP_SPEED, 30.26 + DIST_AXIS_CDS); // Initially 30.26 + DIST_AXIS_CDS. Took off because no longer moves forward after jukebox
+            // move_forward_inches(RAMP_SPEED, 30.26 + DIST_AXIS_CDS); // Initially 30.26 + DIST_AXIS_CDS. Took off because no longer moves forward after jukebox
+            move_forward_PID(5, 30.26 + DIST_AXIS_CDS);
 
             // Checks x and y coordinate after going up
             // RPS_check_y(RPS_Top_Level_Y_Reference, 2); 
@@ -2139,7 +2375,7 @@ void run_course(int courseNumber) {
             // Checks x (may need to edit)
             //turn_left_degrees(TURN_SPEED, 90); 
             turn_right_degrees(TURN_SPEED, 90); // Initially 180 degrees to correct for RPS check
-            RPS_check_x(RPS_Top_Level_X_Reference + 4.65, 3);
+            RPS_check_x(RPS_Top_Level_X_Reference + 4.65, 8);
             
 
 
@@ -2184,7 +2420,7 @@ void run_course(int courseNumber) {
 
             // Reverses towards ticket
             move_forward_inches(-FORWARD_SPEED, 13); // Initially 13.65
-            RPS_check_x(RPS_Top_Level_X_Reference + 13, 2);
+            RPS_check_x(RPS_Top_Level_X_Reference + 13, 6);
 
             // Facing ticket
             turn_left_degrees(TURN_SPEED, 90);
@@ -2193,7 +2429,7 @@ void run_course(int courseNumber) {
             write_status("Sliding ticket");
             on_arm_servo.SetDegree(45); // Initially 45
             base_servo.SetDegree(0);
-            RPS_check_y(RPS_Top_Level_Y_Reference - 4.65, 2); // 52.25 - 4.65
+            RPS_check_y(RPS_Top_Level_Y_Reference - 4.65, 8); // 52.25 - 4.65
         
             move_forward_inches(20, 5.25); // Inserts arm into ticket slot, initially 0.25
 
@@ -2221,7 +2457,7 @@ void run_course(int courseNumber) {
             // Currently at y=52.25, needs to be at y=55
             RPS_correct_heading(90, 3);
             move_forward_inches(FORWARD_SPEED, 2.75); // 2.75 initially
-            RPS_check_y(RPS_Top_Level_Y_Reference + 2.75, 2);
+            RPS_check_y(RPS_Top_Level_Y_Reference + 2.75, 4);
 
             /* 
              * Flips burger when y=55 and facing towards it
@@ -2229,12 +2465,12 @@ void run_course(int courseNumber) {
              */
             flip_burger();
 
-            RPS_check_y(RPS_Top_Level_Y_Reference + 4, 2); // Initially 55.95, initially plus 3.7
+            RPS_check_y(RPS_Top_Level_Y_Reference + 4, 4); // Initially 55.95, initially plus 3.7
 
             turn_left_degrees(TURN_SPEED, 90);
 
             // In front of initial plate, 4.05 inches from front, heading=0
-            RPS_check_x(RPS_Top_Level_X_Reference + 7.4, 2); // Initially 21.7
+            RPS_check_x(RPS_Top_Level_X_Reference + 7.4, 4); // Initially 21.7
             
 
         /*********************************************************************/
@@ -2312,7 +2548,7 @@ int main() {
     // int courseNumber = start_menu();
 
     // Waits until start light is read
-    read_start_light(15);
+    read_start_light(45);
     // Sleep(1.0);
 
     // Runs specified course number.
@@ -2329,6 +2565,14 @@ int main() {
     // while (true) {
     //     show_RPS_data();
     //     Sleep(0.1);
+    // }
+
+    // Show CdS Cell Value
+    // LCD.Clear();
+    // while (true) {
+    //     LCD.WriteRC(CdS_cell.Value(),1,2);
+    //     Sleep(0.25);
+    //     LCD.Clear();
     // }
     
     //*****************************************

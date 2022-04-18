@@ -5,7 +5,7 @@
 /*      Steven Broaddus, Conolly Burgess     */
 /*        Joseph Richmond, Jake Chang        */
 /*                                           */
-/*            Updated 4/13/2022              */
+/*            Updated 4/18/2022              */
 /*       Uses Doxygen for documentation      */
 /*********************************************/
 
@@ -114,7 +114,8 @@ enum {
 
 /************************************************/
 // Function Prototypes (For reference, these don't actually do anything)
-void update_RPS_Heading_values(double timeToCheck, bool checking_heading, bool checking_x, bool checking_y); // Updates RPS values across the map
+void update_RPS_Heading_values(double timeToCheck, bool checking_heading, bool checking_x, bool checking_y); 
+// ^ Updates RPS values across the course
 int read_start_light(double timeToCheck); // Waits for the start light with a timeout
 void move_forward_inches(int percent, float inches); // Moves forward number of inches
 void move_forward_seconds(float percent, float seconds); // Moves forward for a number of seconds
@@ -127,14 +128,14 @@ void ResetPIDVariables(); // Resets PID variables
 float RightPIDAdjustment(double expectedSpeed); // Corrects right motor based on speed, counts, and expected speed
 float LeftPIDAdjustment(double expectedSpeed); // Corrects left motor based on speed, counts, and expected speed
 void move_forward_PID(float in_per_sec, float inches); // Uses PID to move forward a specific amount of inches
-void initiateServos(); // Initiates speed
+void initiate_servos(); // Initiates servos
 int detect_color(int timeToDetect); // Detects the color of the jukebox with timeout
 void press_jukebox_buttons(); // Presses the jukebox buttons
 void flip_burger(); // Flips the hot plate and burger
 void flip_ice_cream_lever(); // Flips the correct ice cream lever
-void write_status(const char status[]); // Clears room for a printed string w/o clearing display
+void write_status(const char status[]); // Clears room for a printed string w/o clearing entire display
 void show_RPS_data(); // Shows basic RPS data for the robot
-void run_course(int courseNumber); // Runs the course specified by startUp()
+void run_course(int courseNumber); // Runs the specified course
 
 /************************************************/
 // Declarations for encoders/motors
@@ -912,7 +913,7 @@ void move_forward_PID(float in_per_sec, float inches) {
  * @brief Initiates both servos, sets min/max values and 
  * turns it to starting rotation.
  */
-void initiateServos() {
+void initiate_servos() {
     
     // Calibrates base servo
     base_servo.SetMin(BASE_SERVO_MIN);
@@ -2131,7 +2132,7 @@ void run_course(int courseNumber) {
 int main() {
 
     // Initiates servos 25.3 58.3
-    initiateServos();
+    initiate_servos();
 
     // Initializes RPS
     RPS.InitializeTouchMenu();
